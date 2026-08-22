@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#120b09"/>
+  <g transform="translate(970 320)" fill="none" stroke="#ff7657"><circle r="205" opacity=".32"/><circle r="145" opacity=".48"/><circle r="84" opacity=".68"/><path d="M-205 0h410M0-205v410" opacity=".3"/></g>
+  <circle cx="1052" cy="220" r="11" fill="#ff7657"/><circle cx="889" cy="380" r="8" fill="#ffb39f"/>
+  <text x="72" y="105" fill="#fff3ef" font-family="Arial, sans-serif" font-size="31" font-weight="700">Vuln<tspan fill="#ff7657">Scope</tspan></text>
+  <text x="72" y="255" fill="#fff3ef" font-family="Arial, sans-serif" font-size="66" font-weight="700">Find what a public site</text>
+  <text x="72" y="332" fill="#ff7657" font-family="Arial, sans-serif" font-size="66">exposes.</text>
+  <text x="76" y="408" fill="#bca7a0" font-family="Arial, sans-serif" font-size="26">Bounded, evidence-backed security checks</text>
+</svg>

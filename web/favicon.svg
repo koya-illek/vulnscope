@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">VulnScope</title>
+  <rect width="64" height="64" rx="18" fill="#120b09"/>
+  <circle cx="32" cy="32" r="21" fill="none" stroke="#ff7657" stroke-width="3"/>
+  <circle cx="32" cy="32" r="12" fill="none" stroke="#ff7657" stroke-width="3"/>
+  <path d="M32 7v50M7 32h50" stroke="#ff7657" stroke-width="2" opacity=".6"/>
+  <circle cx="42" cy="23" r="4" fill="#ffb39f"/>
+</svg>

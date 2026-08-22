@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://scan.illek.ie/sitemap.xml

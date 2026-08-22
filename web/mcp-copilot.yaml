@@ -1,0 +1,20 @@
+swagger: '2.0'
+info:
+  title: VulnScope MCP
+  description: Run bounded unauthenticated reconnaissance against authorised public websites and retrieve complete stored reports. Full REST and result schemas are at https://scan.illek.ie/openapi.yaml.
+  version: 2.0.0
+host: scan.illek.ie
+basePath: /
+schemes: [https]
+paths:
+  /mcp/v2:
+    post:
+      summary: VulnScope tools
+      description: Stateless JSON MCP endpoint exposing scan_website and get_vulnscope_report. Both tools publish input and output JSON Schemas through tools/list. Scan progress is available through the REST NDJSON endpoint.
+      x-ms-agentic-protocol: mcp-streamable-1.0
+      operationId: InvokeVulnScopeMCP
+      consumes: [application/json]
+      produces: [application/json]
+      responses:
+        '200': { description: MCP response }
+        '202': { description: MCP notification accepted }

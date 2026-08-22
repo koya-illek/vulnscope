@@ -1,0 +1,207 @@
+openapi: 3.0.3
+info:
+  title: VulnScope API
+  version: 2.0.0
+  description: |
+    Bounded, unauthenticated reconnaissance for authorised public websites.
+    No authentication is currently required. VulnScope observes public responses
+    and does not exploit vulnerabilities, submit forms, bypass authentication, or
+    certify a target as secure. Only scan systems you own or are authorised to test.
+servers:
+  - url: https://scan.illek.ie
+x-ai-usage:
+  preferred-interface: REST or JSON MCP
+  mcp-endpoint: https://scan.illek.ie/mcp/v2
+  mcp-protocol-version: 2025-11-25
+  mcp-tools: [scan_website, get_vulnscope_report]
+  instructions:
+    - Confirm the user is authorised to assess the target before calling the tool.
+    - Supply only a public HTTP or HTTPS URL; private, local, and unsafe redirect targets are blocked.
+    - Leave probePaths false unless sensitive-path evidence is specifically needed.
+    - Leave checkTakeover false unless takeover evidence is specifically needed.
+    - A partial or INCOMPLETE report must be described with its coverage gaps.
+    - Findings are reconnaissance guidance, not proof of exploitability or security.
+x-availability: Open for testing. Limited requests.
+paths:
+  /api/v2/scan:
+    post:
+      operationId: scanWebsite
+      summary: Scan an authorised public website
+      description: Performs bounded checks for headers, cookies, CORS, DNS, public exposure, fingerprints, secrets, WordPress signals, advertised methods, and optional takeover evidence.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScanRequest' }
+            example: { url: 'https://example.com', probePaths: false, checkTakeover: false }
+      responses:
+        '201':
+          description: Completed or partial scan report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScanReport' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { description: Target is disallowed, non-public, or failed SSRF validation }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/scans/stream:
+    post:
+      operationId: streamWebsiteScan
+      summary: Scan with newline-delimited progress events
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ScanRequest' } } }
+      responses:
+        '200':
+          description: NDJSON progress events ending with a result or error event. The stream is synchronous and is not an SSE connection.
+          content:
+            application/x-ndjson:
+              schema:
+                type: string
+                description: One JSON object per line with type progress, result, or error.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { description: Target is disallowed, non-public, or failed SSRF validation }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/scans/{reportId}:
+    get:
+      operationId: getVulnScopeReport
+      summary: Retrieve an unexpired scan report
+      parameters:
+        - { name: reportId, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{16}$' } }
+      responses:
+        '200': { description: Stored scan report, content: { application/json: { schema: { $ref: '#/components/schemas/ScanReport' } } } }
+        '404': { description: Report not found or expired }
+  /api/scans/{reportId}/export:
+    get:
+      operationId: exportVulnScopeReport
+      summary: Download an unexpired scan report as formatted JSON
+      parameters:
+        - { name: reportId, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{16}$' } }
+      responses:
+        '200': { description: JSON report attachment, content: { application/json: { schema: { $ref: '#/components/schemas/ScanReport' } } } }
+        '404': { description: Report not found or expired }
+components:
+  schemas:
+    ScanRequest:
+      type: object
+      additionalProperties: false
+      required: [url]
+      properties:
+        url: { type: string, format: uri, maxLength: 2048, description: Public HTTP or HTTPS URL the caller is authorised to assess. }
+        probePaths: { type: boolean, default: false, description: Opt in to the bounded catalogue of public sensitive paths. }
+        checkTakeover: { type: boolean, default: false, description: Run bounded subdomain takeover evidence checks. }
+    ScanReport:
+      type: object
+      required: [schemaVersion, id, requestedUrl, hostname, status, createdAt, expiresAt, totalDurationMs, observation, outbound, coverage, dns, ssl, fingerprint, headers, cookies, exposedPaths, cors, findings, summary]
+      properties:
+        schemaVersion: { type: integer, enum: [2] }
+        id: { type: string, description: Report identifier. }
+        requestedUrl: { type: string, format: uri }
+        hostname: { type: string }
+        status: { type: string, enum: [complete, partial, failed] }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        totalDurationMs: { type: integer, minimum: 0 }
+        observation: { type: object, additionalProperties: true, description: Cloudflare edge vantage and measurement disclaimer. }
+        outbound: { $ref: '#/components/schemas/OutboundSummary' }
+        coverage: { $ref: '#/components/schemas/Coverage' }
+        dns: { type: object, additionalProperties: true }
+        ssl: { type: object, additionalProperties: true }
+        fingerprint: { type: object, additionalProperties: true }
+        headers: { type: object, additionalProperties: true }
+        cookies: { type: array, items: { type: object, additionalProperties: true } }
+        exposedPaths: { type: array, items: { type: object, additionalProperties: true } }
+        cors: { type: object, additionalProperties: true }
+        takeover: { type: array, items: { type: object, additionalProperties: true } }
+        secrets: { type: array, items: { type: object, additionalProperties: true } }
+        wordpress: { type: array, items: { type: object, additionalProperties: true } }
+        methods: { type: object, additionalProperties: true }
+        findings:
+          type: array
+          items: { $ref: '#/components/schemas/Finding' }
+        summary: { $ref: '#/components/schemas/Summary' }
+    Coverage:
+      type: object
+      additionalProperties: false
+      required: [mainFetch, headers, tlsProtocolCipher, certificateEvidence, dns, cookies, paths, cors, secrets, wordpress, methods, takeover, criticalGaps]
+      properties:
+        mainFetch: { $ref: '#/components/schemas/CoveragePhase' }
+        headers: { $ref: '#/components/schemas/CoveragePhase' }
+        tlsProtocolCipher: { $ref: '#/components/schemas/CoveragePhase' }
+        certificateEvidence: { $ref: '#/components/schemas/CoveragePhase' }
+        dns: { $ref: '#/components/schemas/CoveragePhase' }
+        cookies: { $ref: '#/components/schemas/CoveragePhase' }
+        paths: { $ref: '#/components/schemas/CoveragePhase' }
+        cors: { $ref: '#/components/schemas/CoveragePhase' }
+        secrets: { $ref: '#/components/schemas/CoveragePhase' }
+        wordpress: { $ref: '#/components/schemas/CoveragePhase' }
+        methods: { $ref: '#/components/schemas/CoveragePhase' }
+        takeover: { $ref: '#/components/schemas/CoveragePhase' }
+        criticalGaps: { type: array, items: { type: string } }
+    CoveragePhase:
+      type: object
+      additionalProperties: false
+      required: [status, detail]
+      properties:
+        status: { type: string, enum: [measured, unavailable, skipped, failed, partial] }
+        detail: { type: string }
+        requested: { type: boolean }
+        attempts: { type: integer, minimum: 0 }
+        succeeded: { type: integer, minimum: 0 }
+        failed: { type: integer, minimum: 0 }
+        skipped: { type: integer, minimum: 0 }
+        bytes: { type: integer, minimum: 0 }
+        truncated: { type: boolean }
+        errors: { type: array, items: { type: string } }
+    OutboundSummary:
+      type: object
+      additionalProperties: false
+      required: [maxSubrequests, maxConcurrent, maxDurationMs, requestsAttempted, requestsSucceeded, requestsFailed, requestsSkipped, activePeak, bodyBytes, truncatedBodies, redirects]
+      properties:
+        maxSubrequests: { type: integer, minimum: 1 }
+        maxConcurrent: { type: integer, minimum: 1 }
+        maxDurationMs: { type: integer, minimum: 1 }
+        requestsAttempted: { type: integer, minimum: 0 }
+        requestsSucceeded: { type: integer, minimum: 0 }
+        requestsFailed: { type: integer, minimum: 0 }
+        requestsSkipped: { type: integer, minimum: 0 }
+        activePeak: { type: integer, minimum: 0 }
+        bodyBytes: { type: integer, minimum: 0 }
+        truncatedBodies: { type: integer, minimum: 0 }
+        redirects: { type: array, items: { type: object, additionalProperties: false, required: [from, to, status], properties: { from: { type: string }, to: { type: string }, status: { type: integer } } } }
+    Finding:
+      type: object
+      required: [id, severity, category, title, detail, evidence, recommendation]
+      properties:
+        id: { type: string }
+        severity: { type: string, enum: [critical, high, medium, low, info] }
+        category: { type: string, enum: [exposed-path, missing-header, weak-tls, cors, cookie, takeover, fingerprint, information-disclosure, secret, wordpress, method] }
+        title: { type: string }
+        detail: { type: string }
+        evidence: { type: string }
+        recommendation: { type: string }
+    Summary:
+      type: object
+      required: [grade, critical, high, medium, low, info]
+      properties:
+        grade: { type: string, enum: [A, B, C, D, F, INCOMPLETE] }
+        critical: { type: integer, minimum: 0 }
+        high: { type: integer, minimum: 0 }
+        medium: { type: integer, minimum: 0 }
+        low: { type: integer, minimum: 0 }
+        info: { type: integer, minimum: 0 }
+    Error:
+      type: object
+      additionalProperties: true
+      properties:
+        error: { type: string }
+  responses:
+    BadRequest:
+      description: Invalid JSON, URL, or options
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RateLimited:
+      description: Request limit reached
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }

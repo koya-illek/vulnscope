@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Unauthenticated web vulnerability scanner. Check for exposed files, security headers, certificate evidence, CORS misconfigurations, and subdomain takeover risk.">
+  <meta name="theme-color" content="#07100e">
+  <meta property="og:title" content="VulnScope: Find what's exposed">
+  <meta property="og:description" content="Unauthenticated web vulnerability scanner. Check for exposed files, security headers, certificate evidence, CORS misconfigurations, and subdomain takeover risk.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://scan.illek.ie/">
+  <meta property="og:image" content="https://scan.illek.ie/social-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="VulnScope bounded public-site security scan">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://scan.illek.ie/social-card.png">
+  <link rel="canonical" href="https://scan.illek.ie/">
+  <title>VulnScope: Find what's exposed</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./config.js" defer></script>
+  <script src="./report-view.js" defer></script>
+  <script src="./app.js" defer></script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"VulnScope","url":"https://scan.illek.ie/","description":"Run bounded unauthenticated public-site security checks with evidence-backed reports.","applicationCategory":"SecurityApplication","operatingSystem":"Any","browserRequirements":"Requires a modern web browser"}</script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to vulnerability scan</a>
+  <div class="grid-field" aria-hidden="true"></div>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="VulnScope home">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span>Vuln<span>Scope</span></span>
+    </a>
+    <nav aria-label="Primary navigation">
+      <button class="text-button" id="method-button" type="button">Methodology</button>
+      <a class="status-link" href="#status"><span></span> Scanner ready</a>
+    </nav>
+  </header>
+
+  <main id="main-content">
+    <section class="hero" id="home">
+      <h1>Find what's<br><em>exposed.</em></h1>
+      <p class="hero-copy">Unauthenticated scan for exposed files, security headers, certificate evidence, CORS misconfigurations, and subdomain takeover risk in one evidence-backed report.</p>
+
+      <form class="trace-form" id="scan-form">
+        <label for="url-input">Target URL</label>
+        <div class="input-shell">
+          <span class="protocol" aria-hidden="true">URL</span>
+          <input id="url-input" name="url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="example.com" maxlength="2048" required>
+        </div>
+        <div class="form-meta">
+          <span>Public HTTP/S targets only</span>
+          <span>Reports expire after 14 days</span>
+          <span>No login required</span>
+        </div>
+        <fieldset class="scan-scope">
+          <legend>Optional scan scope</legend>
+          <label class="deps-toggle">
+            <input type="checkbox" id="probe-paths" name="probePaths">
+            <span class="deps-toggle-text">
+              <strong>Probe sensitive paths</strong>
+              <small>.env · .git · backups · config files. Uses a bounded request budget.</small>
+            </span>
+          </label>
+          <label class="deps-toggle">
+            <input type="checkbox" id="check-takeover" name="checkTakeover">
+            <span class="deps-toggle-text">
+              <strong>Check subdomain takeover</strong>
+              <small>Certificate Transparency · dangling CNAMEs. Uses bounded DNS and HTTP checks.</small>
+            </span>
+          </label>
+        </fieldset>
+        <label class="auth-checkbox">
+          <input type="checkbox" id="auth-confirm" name="authConfirm" required>
+          <span class="deps-toggle-text">
+            <strong>I confirm I own or have permission to scan this target</strong>
+            <small>Unauthorised scanning may be illegal under the Criminal Justice (Offences relating to Information Systems) Act 2017</small>
+          </span>
+        </label>
+        <div class="scan-submit-row">
+          <span class="scan-submit-help" id="scan-state" aria-live="polite">Confirm permission to enable the scan.</span>
+          <button class="scan-submit" type="submit" id="scan-button" aria-describedby="scan-state" disabled>
+            <span>Run authorised scan</span>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11m-4-4 4 4-4 4"/></svg>
+          </button>
+        </div>
+      </form>
+
+      <div class="hero-route" aria-hidden="true">
+        <span>RECON</span><i></i><span>HEADERS</span><i></i><span>PATHS</span><i></i><span>CORS</span>
+      </div>
+    </section>
+
+    <section class="progress-panel hidden" id="progress-panel" aria-live="polite">
+      <div class="progress-head">
+        <div>
+          <h2 id="progress-title">Scanning target</h2>
+        </div>
+        <span class="spinner" aria-hidden="true"></span>
+      </div>
+      <div class="live-route" id="live-route" aria-hidden="true">
+        <div class="route-node active" data-stage="0"><span>01</span><strong>RECON</strong></div>
+        <div class="route-wire"><i></i></div>
+        <div class="route-node" data-stage="1"><span>02</span><strong>HEADERS</strong></div>
+        <div class="route-wire"><i></i></div>
+        <div class="route-node" data-stage="2"><span>03</span><strong>PATHS</strong></div>
+        <div class="route-wire"><i></i></div>
+        <div class="route-node" data-stage="3"><span>04</span><strong>FINGERPRINT</strong></div>
+        <div class="route-wire"><i></i></div>
+        <div class="route-node" data-stage="4"><span>05</span><strong>CORS</strong></div>
+        <div class="route-wire"><i></i></div>
+        <div class="route-node" data-stage="5"><span>06</span><strong>REPORT</strong></div>
+      </div>
+      <div class="progress-track"><i id="progress-bar"></i></div>
+      <ol class="progress-steps" id="progress-steps">
+        <li class="active">Reconnaissance</li>
+        <li>Security headers</li>
+        <li>Exposed paths</li>
+        <li>Fingerprint</li>
+        <li>CORS test</li>
+        <li>Build report</li>
+      </ol>
+    </section>
+
+    <section class="error-panel hidden" id="error-panel" role="alert" tabindex="-1">
+      <span class="error-code">SCAN_FAILED</span>
+      <div>
+        <h2>The scan could not be completed</h2>
+        <p id="error-message"></p>
+      </div>
+      <button type="button" id="error-close" aria-label="Dismiss error">×</button>
+    </section>
+
+    <section class="report hidden" id="report">
+      <header class="report-header">
+        <div>
+          <h2 id="report-host" tabindex="-1">example.com</h2>
+          <a id="report-url" href="#" target="_blank" rel="noopener noreferrer"></a>
+          <p class="report-meta" id="report-meta" aria-live="polite"></p>
+          <p class="report-privacy-warning">The report link is public until expiry. Share it only with approved reviewers.</p>
+        </div>
+        <div class="report-actions">
+          <button class="secondary-button" id="copy-link" type="button">Copy share link</button>
+          <button class="secondary-button" id="export-json" type="button">Export JSON</button>
+          <button class="icon-button" id="new-scan" type="button" aria-label="Start a new scan">+</button>
+        </div>
+      </header>
+
+      <div class="grade-section" id="grade-section">
+        <div class="grade-badge" id="grade-badge">
+          <span class="grade-letter" id="grade-letter">Pending</span>
+          <span class="grade-label" id="grade-label">HTTP surface grade</span>
+        </div>
+        <div class="metrics" id="metrics"></div>
+      </div>
+
+      <div class="section-heading">
+        <div>
+          <span class="section-number">01</span>
+          <div><h3>Findings</h3><p> Vulnerabilities and misconfigurations discovered</p></div>
+        </div>
+        <div class="filter-set" role="group" aria-label="Severity filters">
+          <button class="filter active" data-filter="all" type="button">All</button>
+          <button class="filter" data-filter="critical" type="button">Critical</button>
+          <button class="filter" data-filter="high" type="button">High</button>
+          <button class="filter" data-filter="medium" type="button">Medium</button>
+          <button class="filter" data-filter="low" type="button">Low</button>
+          <button class="filter" data-filter="info" type="button">Info</button>
+        </div>
+      </div>
+      <p class="visually-hidden" role="status" id="findings-status"></p>
+      <div class="findings-list" id="findings-list"></div>
+
+      <section class="panel details-panel">
+        <div class="panel-header">
+          <div><span class="section-number">02</span><h3>Scan details</h3></div>
+          <span class="evidence-badge">EVIDENCE-BACKED</span>
+        </div>
+
+        <details class="collapsible-section" open>
+          <summary><span class="cs-icon">DNS</span> DNS &amp; SSL details</summary>
+          <div class="cs-body" id="dns-ssl-details"></div>
+        </details>
+
+        <details class="collapsible-section" open>
+          <summary><span class="cs-icon">COV</span> Scan coverage</summary>
+          <div class="cs-body" id="coverage-details"></div>
+        </details>
+
+        <details class="collapsible-section" open>
+          <summary><span class="cs-icon">HDR</span> Security headers audit</summary>
+          <div class="cs-body" id="headers-audit"></div>
+        </details>
+
+        <details class="collapsible-section" open>
+          <summary><span class="cs-icon">FNG</span> Technology fingerprint</summary>
+          <div class="cs-body" id="fingerprint-details"></div>
+        </details>
+
+        <details class="collapsible-section">
+          <summary><span class="cs-icon">CKE</span> Cookies <span class="cs-count" id="cookie-count"></span></summary>
+          <div class="cs-body" id="cookie-details"></div>
+        </details>
+
+        <details class="collapsible-section" open>
+          <summary><span class="cs-icon">PTH</span> Exposed paths <span class="cs-count" id="paths-count"></span></summary>
+          <div class="cs-body" id="paths-details"></div>
+        </details>
+
+        <details class="collapsible-section" open>
+          <summary><span class="cs-icon">CRS</span> CORS test</summary>
+          <div class="cs-body" id="cors-details"></div>
+        </details>
+
+        <details class="collapsible-section hidden" id="takeover-section">
+          <summary><span class="cs-icon">TKO</span> Subdomain takeover <span class="cs-count" id="takeover-count"></span></summary>
+          <div class="cs-body" id="takeover-details"></div>
+        </details>
+      </section>
+
+      <div class="observation-note">
+        <strong>Observation boundary</strong>
+        <p id="observation-note">This grade reflects the measured main GET, security header audit, and observed unauthenticated web findings. Origin TLS protocol/cipher and certificate-transparency history are shown separately in coverage. VulnScope performs unauthenticated checks only. It does not attempt exploitation, submit forms, or bypass authentication. Findings reflect what an external observer can discover without credentials.</p>
+      </div>
+    </section>
+
+    <section class="principles" id="status">
+      <h2 class="visually-hidden">Scanning principles</h2>
+      <div class="principle-grid">
+        <article><span>01</span><h3>Unauthenticated only</h3><p>Every check runs without credentials, showing what an external attacker can see.</p></article>
+        <article><span>02</span><h3>Evidence-backed</h3><p>Every finding includes the raw HTTP response or configuration that revealed it.</p></article>
+        <article><span>03</span><h3>Safe by default</h3><p>Private targets, non-standard ports, and exploitation attempts are blocked.</p></article>
+      </div>
+    </section>
+
+    <section class="developer-access" aria-labelledby="developer-access-title">
+      <div>
+        <h2 id="developer-access-title">Run authorised scans from your agent or workflow</h2>
+        <p>Create bounded public-site scans and retrieve complete evidence-backed reports through REST or JSON MCP.</p>
+        <p class="developer-note">Open for testing. Limited requests. Scan only systems you are authorised to assess.</p>
+      </div>
+      <div class="developer-links">
+        <a href="./openapi.yaml" type="application/yaml"><strong>REST API</strong><span>OpenAPI contract and examples</span></a>
+        <div class="developer-endpoint"><strong>MCP endpoint · 2 tools</strong><code>scan.illek.ie/mcp/v2</code></div>
+        <a href="./mcp-copilot.yaml" type="application/yaml"><strong>Copilot connector</strong><span>Import-ready MCP definition</span></a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <a class="brand small" href="./"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>VulnScope</span></a>
+    <p>Independent web vulnerability scanning.</p>
+    <p>© 2026 Illek. All rights reserved. Diagnostic guidance only. Not a substitute for penetration testing.</p>
+    <a class="text-button" href="./openapi.yaml" type="application/yaml">Developer API</a>
+    <a class="text-button" href="https://tools.illek.ie/privacy">Privacy</a>
+    <button class="text-button" id="footer-method-button" type="button">How scanning works</button>
+  </footer>
+
+  <dialog id="method-dialog" aria-labelledby="method-dialog-title" aria-describedby="method-dialog-description">
+    <button class="dialog-close" id="dialog-close" type="button" aria-label="Close">×</button>
+    <h2 id="method-dialog-title">What VulnScope scans</h2>
+    <p id="method-dialog-description" class="dialog-description">A bounded external observation. No credentials, exploit payloads, form submissions, or destructive methods are used.</p>
+    <div class="method-list">
+      <article><span>RECON</span><div><h3>DNS &amp; SSL reconnaissance</h3><p>Resolves DNS records and records certificate-transparency evidence with its limitations. Origin TLS protocol and cipher details are not fabricated when the Worker cannot measure them.</p></div></article>
+      <article><span>HDR</span><div><h3>Security header audit</h3><p>Checks for presence and correctness of HSTS, CSP, X-Frame-Options, X-Content-Type-Options, and other security headers.</p></div></article>
+      <article><span>PTH</span><div><h3>Sensitive path probing</h3><p>Tests for commonly exposed files: .env, .git/config, backup archives, admin panels, and configuration files.</p></div></article>
+      <article><span>FNG</span><div><h3>Technology fingerprinting</h3><p>Identifies server software, CMS, frameworks, and observed languages from response headers, cookies, and HTML markers.</p></div></article>
+      <article><span>CRS</span><div><h3>CORS misconfiguration test</h3><p>Tests whether the target returns permissive Access-Control headers that could enable cross-origin data theft.</p></div></article>
+      <article><span>TKO</span><div><h3>Subdomain takeover check</h3><p>Uses Certificate Transparency subdomains to probe for dangling CNAME records pointing to claimable services.</p></div></article>
+    </div>
+    <p class="dialog-footnote">VulnScope does not exploit vulnerabilities, submit forms, bypass authentication, or test for injection. All outbound target probes use GET, OPTIONS, or TRACE only; no other HTTP method is sent. HTTP method checks use OPTIONS advertisements and non-mutating TRACE reconnaissance. Use the report for defensive reconnaissance and evidence review.</p>
+  </dialog>
+</body>
+</html>
