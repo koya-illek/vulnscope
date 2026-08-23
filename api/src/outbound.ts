@@ -199,8 +199,6 @@ export interface SafeFetchOptions extends RequestInit {
   context?: OutboundContext;
 }
 
-const responseMetadata = new WeakMap<Response, { finalUrl: string; redirectChain: OutboundRequestSummary["redirects"] }>();
-
 /**
  * Fetch a public target through one fail-closed policy. Redirects are manual,
  * every hop is validated and resolved, and same-host is the default boundary.
@@ -215,7 +213,6 @@ export async function safeFetch(input: RequestInfo | URL, options: SafeFetchOpti
   let current = input instanceof Request ? new URL(input.url) : new URL(input.toString());
   const originalHost = current.hostname.toLowerCase().replace(/\.$/, "");
   const maxRedirects = Math.min(Math.max(options.maxRedirects ?? 3, 0), 5);
-  const redirectChain: OutboundRequestSummary["redirects"] = [];
   const allowCrossHost = options.allowCrossHost === true;
   const followRedirects = options.followRedirects !== false;
 
@@ -275,7 +272,6 @@ export async function safeFetch(input: RequestInfo | URL, options: SafeFetchOpti
     const location = response.headers.get("location");
     const isRedirect = response.status >= 300 && response.status < 400 && Boolean(location);
     if (!isRedirect || !followRedirects) {
-      responseMetadata.set(response, { finalUrl: current.toString(), redirectChain: [...redirectChain] });
       return response;
     }
     if (redirects >= maxRedirects) {
@@ -292,7 +288,6 @@ export async function safeFetch(input: RequestInfo | URL, options: SafeFetchOpti
     // A redirect may not widen the host boundary unless the caller opted in.
     validateHostBoundary(next.hostname, baseUrl || new URL(`https://${originalHost}`), allowCrossHost);
     const hop = { from: redactOutboundUrl(current), to: redactOutboundUrl(next), status: response.status };
-    redirectChain.push(hop);
     context?.budget.redirects.push(hop);
     await response.body?.cancel();
     redirects++;
@@ -349,10 +344,6 @@ export async function infrastructureFetch(
   } finally {
     context?.budget.release();
   }
-}
-
-export function getFetchMetadata(response: Response): { finalUrl: string; redirectChain: OutboundRequestSummary["redirects"] } | undefined {
-  return responseMetadata.get(response);
 }
 
 export async function readBoundedBody(
