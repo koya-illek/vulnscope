@@ -2,6 +2,9 @@ const baseUrl = process.env.VULNSCOPE_BASE_URL || "https://scan.illek.ie";
 const successfulTarget =
   process.env.VULNSCOPE_SMOKE_TARGET ||
   `https://example.com/?vulnscope-smoke=${Date.now()}`;
+// Local Worker URLs are not valid scan targets. An override lets local and
+// staging checks exercise the canonical-host self-scan boundary instead.
+const selfTarget = process.env.VULNSCOPE_SELF_TARGET || baseUrl;
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -24,7 +27,7 @@ assert(health.ok, `Health returned HTTP ${health.status}`);
 const healthBody = await health.json();
 assert(healthBody.ok === true, "Health payload was not healthy");
 
-const selfScan = await post("/api/v2/scan", baseUrl);
+const selfScan = await post("/api/v2/scan", selfTarget);
 const selfBody = await selfScan.json();
 assert(selfScan.status === 403, `Self-scan returned HTTP ${selfScan.status}`);
 assert(
@@ -50,7 +53,7 @@ assert(
   "A fully measured target scan remained ungraded",
 );
 
-const stream = await post("/api/scans/stream", baseUrl);
+const stream = await post("/api/scans/stream", selfTarget);
 assert(stream.ok, `Stream endpoint returned HTTP ${stream.status}`);
 const events = (await stream.text())
   .split("\n")
