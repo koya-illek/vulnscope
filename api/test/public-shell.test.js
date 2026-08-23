@@ -14,6 +14,11 @@ describe("public shell", () => {
     expect(html).toMatch(/I confirm I own or have permission to scan this target/);
     expect(html).toMatch(/Run authorised scan/);
     expect(html).toMatch(/id="scan-button"[^>]*disabled/);
+    // The scan-progress live region covers the stage title only; the route
+    // nodes are aria-hidden and the step list is a visual duplicate, so a
+    // panel-wide live region would announce the duplication on every stage.
+    expect(html).toMatch(/<section class="progress-panel hidden" id="progress-panel">/);
+    expect(html).toMatch(/<h2 id="progress-title" aria-live="polite">/);
     expect(html).not.toMatch(/class="(?:eyebrow|section-kicker)"/);
     expect(html).not.toContain("—");
   });
