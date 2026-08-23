@@ -164,13 +164,36 @@ describe("scanWordPress", () => {
     globalThis.fetch = mockFetch({
       "/wp-content/debug.log": {
         status: 200,
-        body: "[04-Jan-2024] PHP Warning: some error\n[04-Jan-2024] PHP Stack trace:\n",
+        body: "[04-Jan-2024 06:12:00 UTC] PHP Warning: some error\n[04-Jan-2024 06:12:01 UTC] PHP Stack trace:\n",
       },
     });
     const results = await scanWordPress(new URL("https://example.com"), "");
     const debugLog = results.find((r) => r.check === "wp-debug-log");
     expect(debugLog).toBeTruthy();
     expect(debugLog!.severity).toBe("medium");
+    expect(debugLog!.evidence).toContain("dated PHP log entries");
+  });
+
+  it("detects a debug log through an explicit PHP severity marker without a date", async () => {
+    globalThis.fetch = mockFetch({
+      "/wp-content/debug.log": {
+        status: 200,
+        body: "PHP Fatal error: Uncaught Error: Call to undefined function",
+      },
+    });
+    const results = await scanWordPress(new URL("https://example.com"), "");
+    expect(results.find((r) => r.check === "wp-debug-log")).toBeTruthy();
+  });
+
+  it("does not accuse themed 200 fallback pages of exposing the debug log", async () => {
+    globalThis.fetch = mockFetch({
+      "/wp-content/debug.log": {
+        status: 200,
+        body: "<!doctype html><html><head><title>Page not found</title></head><body><h1>Sorry, an Error occurred</h1><p>Warning: the page you requested was not found.</p></body></html>",
+      },
+    });
+    const results = await scanWordPress(new URL("https://example.com"), "");
+    expect(results.find((r) => r.check === "wp-debug-log")).toBeFalsy();
   });
 
   it("detects directory listing for uploads", async () => {

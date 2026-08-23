@@ -275,14 +275,21 @@ async function checkDebugLog(baseUrl: URL, context?: OutboundContext): Promise<W
     });
     if (response.ok) {
       const body = (await readBoundedBody(response, WP_BODY_LIMIT, context, "wordpress")).text;
-      if (body.includes("PHP") || body.includes("Warning") || body.includes("Error") || body.includes("Stack trace")) {
+      // Theme and plugin fallback pages routinely return HTTP 200 with words
+      // like "Error" in their copy. Only WordPress debug-log-specific
+      // evidence may support a public exposure finding: a dated log line in
+      // WP_DEBUG_LOG's "[dd-Mon-yyyy hh:mm:ss UTC] PHP …" format, or an
+      // explicit PHP severity marker that prose does not use as a bare word.
+      const datedLogLine = /\[\d{1,2}-[A-Za-z]{3}-\d{4}[^\]]*\]\s+PHP\s+/;
+      const phpSeverityMarker = /PHP (Warning|Notice|Fatal error|Parse error|Deprecated)\s*:/i;
+      if (datedLogLine.test(body) || phpSeverityMarker.test(body)) {
         const lineCount = body.split("\n").length;
         return {
           check: "wp-debug-log",
           severity: "medium",
           title: "WordPress Debug Log Exposed",
           detail: `The WordPress debug log at /wp-content/debug.log is publicly accessible (~${lineCount} lines). It may contain sensitive information including file paths, errors, and plugin details.`,
-          evidence: `GET /wp-content/debug.log → ${response.status}, ~${lineCount} lines`,
+          evidence: `GET /wp-content/debug.log → ${response.status}, dated PHP log entries observed (~${lineCount} lines)`,
           recommendation: "Delete the debug log, disable WP_DEBUG_LOG, or restrict access via .htaccess.",
         };
       }
