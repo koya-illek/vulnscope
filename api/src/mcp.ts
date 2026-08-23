@@ -1,4 +1,6 @@
 import type { ScanReport } from "./types";
+import { BlockedTargetError, InputError, RateLimitError, ResolverUnavailableError } from "./security";
+import { OutboundPolicyError } from "./outbound";
 
 const MCP_PROTOCOL_VERSION = "2025-11-25";
 const MAX_MCP_REQUEST_BYTES = 16 * 1024;
@@ -7,6 +9,26 @@ export interface VulnScopeMcpInput {
   url: string;
   probePaths?: boolean;
   checkTakeover?: boolean;
+}
+
+/**
+ * Tool failures become JSON-RPC result text, so the same split as the REST
+ * path applies: caller-facing validation, policy, and quota errors keep their
+ * actionable messages; anything unexpected is logged server-side and returned
+ * generically instead of leaking internals to agent clients.
+ */
+export function sanitizeToolError(error: unknown): Error {
+  if (
+    error instanceof InputError ||
+    error instanceof BlockedTargetError ||
+    error instanceof ResolverUnavailableError ||
+    error instanceof RateLimitError ||
+    error instanceof OutboundPolicyError
+  ) {
+    return error;
+  }
+  console.error("scan_failed_mcp", error);
+  return new Error("The scan could not be completed. Please try again.");
 }
 
 export async function handleMcp(
@@ -60,7 +82,7 @@ export async function handleMcp(
       isError: false,
     });
   } catch (error) {
-    const text = error instanceof Error ? error.message : "VulnScope scan failed";
+    const text = sanitizeToolError(error).message;
     return rpcResult(id, { content: [{ type: "text", text }], isError: true });
   }
 }

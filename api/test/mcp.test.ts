@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { handleMcp } from "../src/mcp";
+import { handleMcp, sanitizeToolError } from "../src/mcp";
+import { BlockedTargetError, InputError, RateLimitError, ResolverUnavailableError } from "../src/security";
+import { OutboundPolicyError } from "../src/outbound";
 import type { ScanReport } from "../src/types";
 
 const report = {
@@ -52,4 +54,47 @@ describe("VulnScope MCP", () => {
     expect((await handleMcp(rpc("notifications/initialized", {}, undefined), async () => report)).status).toBe(202);
     expect((await handleMcp(new Request("https://scan.illek.ie/mcp"), async () => report)).status).toBe(405);
   });
-});
+
+  it("keeps caller-facing error messages and returns them as tool errors", async () => {
+    const response = await handleMcp(rpc("tools/call", { name: "scan_website", arguments: { url: "https://example.com" } }), async () => {
+      throw new BlockedTargetError("The hostname resolves to a private or reserved network address.");
+    });
+    const body = await response.json<{ result: { content: Array<{ text: string }>; isError: boolean } }>();
+    expect(body.result.isError).toBe(true);
+    expect(body.result.content[0].text).toBe("The hostname resolves to a private or reserved network address.");
+  });
+
+  it("returns generic text for internal faults instead of leaking internals", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const response = await handleMcp(rpc("tools/call", { name: "scan_website", arguments: { url: "https://example.com" } }), async () => {
+        throw new Error('D1_ERROR: internal constraint details');
+      });
+      const body = await response.json<{ result: { content: Array<{ text: string }>; isError: boolean } }>();
+      expect(body.result.isError).toBe(true);
+      expect(body.result.content[0].text).toBe("The scan could not be completed. Please try again.");
+      expect(body.result.content[0].text).not.toContain("D1_ERROR");
+      expect(consoleError).toHaveBeenCalledWith("scan_failed_mcp", expect.any(Error));
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("sanitises only unexpected errors, preserving known classes", () => {
+    const input = new InputError("A URL is required.");
+    const blocked = new BlockedTargetError("nope");
+    const resolver = new ResolverUnavailableError("resolvers down");
+    const quota = new RateLimitError("Daily scan limit of 10 reached.", 10, 11, "2026-08-22T23:59:59.999Z");
+    const policy = new OutboundPolicyError("The scan time budget was exhausted.", "budget");
+    const internal = new Error("secret internals");
+
+    expect(sanitizeToolError(input)).toBe(input);
+    expect(sanitizeToolError(blocked)).toBe(blocked);
+    expect(sanitizeToolError(resolver)).toBe(resolver);
+    expect(sanitizeToolError(quota)).toBe(quota);
+    expect(sanitizeToolError(policy)).toBe(policy);
+
+    const sanitizedInternal = sanitizeToolError(internal);
+    expect(sanitizedInternal).not.toBe(internal);
+    expect(sanitizedInternal.message).toBe("The scan could not be completed. Please try again.");
+  });});

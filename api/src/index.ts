@@ -5,6 +5,7 @@ import {
   BlockedTargetError,
   InputError,
   normalizeUrl,
+  RateLimitError,
   redactUrlForStorage,
   ResolverUnavailableError,
 } from "./security";
@@ -166,20 +167,6 @@ interface ScanInput {
   url: string;
   probePaths: boolean;
   checkTakeover: boolean;
-}
-
-class RateLimitError extends Error {
-  readonly limit: number;
-  readonly count: number;
-  readonly resetAt: string;
-
-  constructor(message: string, limit: number, count: number, resetAt: string) {
-    super(message);
-    this.name = "RateLimitError";
-    this.limit = limit;
-    this.count = count;
-    this.resetAt = resetAt;
-  }
 }
 
 async function readScanInput(request: Request): Promise<ScanInput> {
