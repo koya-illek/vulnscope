@@ -41,3 +41,12 @@ version `2025-11-25` and publish `scan_website` plus
 From `api/`, run `npm run typecheck`, `npm test`, and `npm run smoke:production`.
 The production smoke confirms DNS resolution, a measured main GET, the NDJSON
 error contract, and the explicit same-Worker self-scan boundary.
+
+## Local development
+
+From `api/`, run `npx wrangler dev --local` and open
+`http://localhost:8788`. The session runs in the development environment via
+`api/.dev.vars`, which disables the production HTTP→HTTPS entry redirect that
+would otherwise loop forever under `wrangler dev`'s custom-domain emulation
+and allowlists the emulated origin so the page can call the API same-origin.
+Production values in `wrangler.toml` are unaffected.
