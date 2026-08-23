@@ -173,7 +173,6 @@ export interface CookieAuditResult {
   domain: string | null;
   path: string | null;
   expires: string | null;
-  issues: string[];
 }
 
 // ─── Exposed paths ─────────────────────────────────────────────────────────

@@ -232,7 +232,6 @@ describe("VulnScope report presentation contract", () => {
       domain: ".example.com",
       path: "/",
       expires: "2026-08-13T00:00:00.000Z",
-      issues: ["HttpOnly is missing"],
     }]);
 
     expect(rows).toEqual([{
@@ -245,8 +244,6 @@ describe("VulnScope report presentation contract", () => {
       ],
       domain: ".example.com",
       expires: "2026-08-13T00:00:00.000Z",
-      issueCount: 1,
-      issueText: "1 issue",
     }]);
     expect(JSON.stringify(rows)).not.toContain("[object Object]");
     expect(JSON.stringify(rows)).not.toContain("value");

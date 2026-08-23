@@ -204,14 +204,11 @@
       ];
       const path = scalarValue(cookie.path);
       if (path) attrs.push({ text: `Path=${path}`, statusClass: "" });
-      const issues = Array.isArray(cookie.issues) ? cookie.issues.length : 0;
       return {
         name: scalarValue(cookie.name) || "Unnamed cookie",
         attrs,
         domain: scalarValue(cookie.domain),
         expires: scalarValue(cookie.expires),
-        issueCount: issues,
-        issueText: issues ? `${issues} issue${issues === 1 ? "" : "s"}` : null,
       };
     });
   }

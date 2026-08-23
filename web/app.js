@@ -484,7 +484,6 @@
         <span class="cookie-attrs">${c.attrs.map((attr) => `<span class="cookie-attr ${attr.statusClass}">${escapeHtml(attr.text)}</span>`).join("")}</span>
         ${c.domain ? `<span class="cookie-attr">Domain=${escapeHtml(c.domain)}</span>` : ""}
         ${c.expires ? `<span class="cookie-attr">Expires=${escapeHtml(c.expires)}</span>` : ""}
-        ${c.issueText ? `<span class="cookie-attr missing">${escapeHtml(c.issueText)}</span>` : ""}
       </div>`;
     }).join("");
   }

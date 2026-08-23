@@ -15,9 +15,7 @@ export function auditCookies(headers: Headers): { cookies: CookieAuditResult[]; 
     const parsed = parseCookie(raw);
     cookies.push(parsed);
 
-    const issues: string[] = [];
-    if (!parsed.secure) {
-      issues.push("Missing Secure flag: cookie can be sent over unencrypted HTTP");
+    if (!parsed.secure) {;
       findings.push({
         id: `cookie-insecure-${parsed.name}`,
         severity: "medium",
@@ -28,8 +26,7 @@ export function auditCookies(headers: Headers): { cookies: CookieAuditResult[]; 
         recommendation: "Add the Secure attribute to the Set-Cookie directive.",
       });
     }
-    if (!parsed.httpOnly) {
-      issues.push("Missing HttpOnly flag: cookie accessible via JavaScript (XSS risk)");
+    if (!parsed.httpOnly) {;
       findings.push({
         id: `cookie-no-httponly-${parsed.name}`,
         severity: "medium",
@@ -40,8 +37,7 @@ export function auditCookies(headers: Headers): { cookies: CookieAuditResult[]; 
         recommendation: "Add the HttpOnly attribute to the Set-Cookie directive.",
       });
     }
-    if (!parsed.sameSite || parsed.sameSite === "None") {
-      issues.push("Missing or weak SameSite attribute: cookie may be sent in cross-site requests (CSRF risk)");
+    if (!parsed.sameSite || parsed.sameSite === "None") {;
       findings.push({
         id: `cookie-weak-samesite-${parsed.name}`,
         severity: "low",
@@ -89,7 +85,6 @@ function parseCookie(raw: string): CookieAuditResult {
   const [nameValue, ...attrs] = parts;
   const eqIndex = nameValue.indexOf("=");
   const name = eqIndex >= 0 ? nameValue.slice(0, eqIndex) : nameValue;
-  const issues: string[] = [];
 
   let secure = false;
   let httpOnly = false;
@@ -116,6 +111,5 @@ function parseCookie(raw: string): CookieAuditResult {
     domain,
     path,
     expires,
-    issues,
   };
 }
