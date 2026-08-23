@@ -7,6 +7,7 @@ const {
   gradePresentation,
   coverageRows,
   exposedPathsState,
+  takeoverState,
   fingerprintRows,
   cookieRows,
 } = globalThis.VulnScopeReport;
@@ -186,6 +187,40 @@ describe("VulnScope report presentation contract", () => {
       status: "failed",
       message: "Path probing failed: timeout",
     });
+  });
+
+  it("shows measured-empty takeover work with a truthful completed message", () => {
+    const state = takeoverState([], { takeover: { status: "measured", requested: true, detail: "Subdomain takeover checks completed for 0 subdomain(s)." } });
+    expect(state).toMatchObject({ status: "measured", visible: true });
+    expect(state.message).toContain("completed");
+    expect(state.message).not.toContain("vulnerable CNAME patterns");
+  });
+
+  it("hides the takeover panel when the report never enabled the checks", () => {
+    // A viewer's own checkbox must not make a skipped phase claim results.
+    expect(takeoverState([], { takeover: { status: "skipped", requested: false, detail: "Subdomain takeover checks were not enabled for this scan." } })).toEqual({
+      status: "skipped",
+      visible: false,
+      message: "Subdomain takeover checks were not enabled for this scan.",
+    });
+    expect(takeoverState([], {}).visible).toBe(false);
+  });
+
+  it("keeps attempted-but-incomplete takeover coverage visible with its reason", () => {
+    const failed = takeoverState([], { takeover: { status: "failed", requested: true, detail: "Certificate Transparency lookup returned HTTP 502." } });
+    expect(failed.visible).toBe(true);
+    expect(failed.message).toContain("HTTP 502");
+    const partial = takeoverState([], { takeover: { status: "partial", requested: true, detail: "budget" } });
+    expect(partial.visible).toBe(true);
+    expect(partial.message).toContain("budget");
+    const unavailable = takeoverState([], { takeover: { status: "unavailable", detail: "no coverage recorded" } });
+    expect(unavailable.visible).toBe(true);
+    expect(unavailable.message).toContain("no coverage recorded");
+  });
+
+  it("keeps found takeover rows visible regardless of stored coverage metadata", () => {
+    const rows = [{ subdomain: "stale.example.com", vulnerable: true, cname: "dead.example", evidence: "signature", confidence: "high" }];
+    expect(takeoverState(rows, {})).toEqual({ status: "measured", visible: true, message: null });
   });
 
   it("formats cookie attributes from the schema without invented values or lengths", () => {

@@ -300,15 +300,13 @@
     renderCookies(report.cookies || []);
     renderExposedPaths(report.exposedPaths || [], report.coverage || {});
     renderCors(report.cors || {});
-    renderTakeover(report.takeover || []);
+    renderTakeover(report.takeover || [], report.coverage || {});
 
-    // Show/hide takeover section
+    // Panel visibility follows the report's own coverage record, not the
+    // viewer's form checkboxes: skipped phases stay hidden, attempted phases
+    // show their truthful empty/partial/failed state.
     const takeoverSection = $("#takeover-section");
-    if (checkTakeoverCheckbox.checked || (report.takeover && report.takeover.length > 0)) {
-      takeoverSection.classList.remove("hidden");
-    } else {
-      takeoverSection.classList.add("hidden");
-    }
+    takeoverSection.classList.toggle("hidden", !reportView.takeoverState(report.takeover || [], report.coverage || {}).visible);
 
     reportPanel.classList.remove("hidden");
     if (updateLocation) history.pushState({ reportId: report.id }, "", `#${report.id}`);
@@ -535,7 +533,7 @@
     ).join("")}</div>`;
   }
 
-  function renderTakeover(takeover) {
+  function renderTakeover(takeover, coverage) {
     const countEl = $("#takeover-count");
     const vulnerable = takeover.filter((t) => t.vulnerable);
     countEl.textContent = vulnerable.length ? `${vulnerable.length} VULNERABLE` : (takeover.length || "");
@@ -543,7 +541,8 @@
     countEl.classList.toggle("cs-count-alert", vulnerable.length > 0);
 
     if (!takeover.length) {
-      $("#takeover-details").innerHTML = `<p class="detail-empty">No subdomains with vulnerable CNAME patterns found.</p>`;
+      const state = reportView.takeoverState(takeover, coverage);
+      $("#takeover-details").innerHTML = `<p class="detail-empty">${escapeHtml(state.message || "No subdomain takeover results were recorded.")}</p>`;
       return;
     }
 

@@ -97,6 +97,30 @@
     return { status, message: null };
   }
 
+  /**
+   * Visibility and empty-state copy for the subdomain-takeover panel. The
+   * report's own coverage record decides whether checks ran; a viewer's form
+   * checkboxes must never make a skipped phase claim results.
+   */
+  function takeoverState(rows, coverage) {
+    const takeoverCoverage = coverage?.takeover || {};
+    const status = takeoverCoverage.status || (rows.length ? "measured" : "skipped");
+    if (rows.length > 0) return { status, visible: true, message: null };
+    if (status === "measured") {
+      return { status, visible: true, message: "Subdomain takeover checks completed; no vulnerable indicators were found." };
+    }
+    if (status === "partial") {
+      return { status, visible: true, message: `Subdomain takeover checks were partial: ${takeoverCoverage.detail || "The safe request budget stopped this phase."}` };
+    }
+    if (status === "failed") {
+      return { status, visible: true, message: `Subdomain takeover checks failed: ${takeoverCoverage.detail || "The scanner could not complete this phase."}` };
+    }
+    if (status === "unavailable") {
+      return { status, visible: true, message: `Subdomain takeover checks unavailable: ${takeoverCoverage.detail || "No coverage was recorded."}` };
+    }
+    return { status: "skipped", visible: false, message: "Subdomain takeover checks were not enabled for this scan." };
+  }
+
   function gradePresentation(summary) {
     const normalized = scalarValue(summary?.grade);
     const grade = normalized ? normalized.toUpperCase() : "Unavailable";
@@ -198,6 +222,7 @@
     gradePresentation,
     coverageRows,
     exposedPathsState,
+    takeoverState,
     fingerprintRows,
     cookieRows,
   };
