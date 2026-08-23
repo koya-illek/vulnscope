@@ -61,13 +61,13 @@ export default {
 
     if (request.method === "OPTIONS") {
       if (request.headers.get("Origin") && !origin) return json({ error: "Origin not allowed" }, 403);
-      return new Response(null, { status: 204, headers: cors });
+      return new Response(null, { status: 204, headers: { ...securityHeaders(), ...cors } });
     }
 
     try {
       if (url.pathname === "/mcp" || url.pathname === "/mcp/v2") {
         if (request.headers.get("Origin") && !origin) return json({ error: "Origin not allowed" }, 403, cors);
-        return handleMcp(request, async (tool, input) => {
+        const response = await handleMcp(request, async (tool, input) => {
           if (tool === "get_vulnscope_report") {
             const reportId = String(input.reportId || "");
             if (!REPORT_ID.test(reportId)) throw new InputError("A valid 16-character report ID is required.");
@@ -81,6 +81,7 @@ export default {
             checkTakeover: input.checkTakeover === true,
           }, env, ctx, () => {}, scanQuotaPolicy(env, "mcp"));
         });
+        return addResponseHeaders(response, { ...securityHeaders(), ...cors });
       }
 
       // Let non-API GET requests fall through to static assets
@@ -639,5 +640,15 @@ function json(payload: unknown, status = 200, extra: Record<string, string> = {}
       ...securityHeaders(),
       ...extra,
     },
+  });
+}
+
+function addResponseHeaders(response: Response, extra: Record<string, string>): Response {
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(extra)) headers.set(name, value);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
   });
 }
