@@ -9,7 +9,7 @@ import {
   redactUrlForStorage,
   ResolverUnavailableError,
 } from "./security";
-import type { Env, OutboundRequestSummary, ScanCoverage, ScanReport } from "./types";
+import type { CoverageStatus, Env, Finding, OutboundRequestSummary, ScanCoverage, ScanReport } from "./types";
 import { handleMcp } from "./mcp";
 import { deriveDailyQuotaKey } from "./quota";
 import { decodeUtf8, readBoundedRequestBody, RequestBodyError } from "./http-body";
@@ -19,6 +19,20 @@ const REPORT_SCHEMA_VERSION = 2;
 const REPORT_ID = /^[A-Za-z0-9_-]{16}$/;
 const MAX_REQUEST_BYTES = 8192;
 const RECENT_SCAN_TTL = 300;
+
+/**
+ * Set-equality assertions between the stored-report validation lists and the
+ * types they mirror. These lists decide which stored fields are trusted on
+ * read, so a phase, status, or severity added to one side without the other
+ * must fail compilation rather than silently skip validation.
+ */
+type SetsEqual<A, B> = ((<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : never);
+type AssertExact<Actual, Expected> = SetsEqual<Actual, Expected>;
+
+// These lists decide which stored fields are trusted on read, so they must
+// enumerate their types exactly: adding a coverage phase, status, or severity
+// without updating the list is a compile error, not a silently unvalidated
+// field.
 const COVERAGE_PHASES = [
   "mainFetch",
   "headers",
@@ -33,8 +47,14 @@ const COVERAGE_PHASES = [
   "methods",
   "takeover",
 ] as const;
+type CoveragePhasesExact = AssertExact<typeof COVERAGE_PHASES[number], Exclude<keyof ScanCoverage, "criticalGaps">>;
+const coveragePhaseListMatchesScanCoverage: CoveragePhasesExact = true;
 const COVERAGE_STATUSES = ["measured", "unavailable", "skipped", "failed", "partial"] as const;
+type CoverageStatusesExact = AssertExact<typeof COVERAGE_STATUSES[number], CoverageStatus>;
+const coverageStatusListMatchesType: CoverageStatusesExact = true;
 const FINDING_SEVERITIES = ["critical", "high", "medium", "low", "info"] as const;
+type FindingSeveritiesExact = AssertExact<typeof FINDING_SEVERITIES[number], Finding["severity"]>;
+const findingSeverityListMatchesType: FindingSeveritiesExact = true;
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
