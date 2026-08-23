@@ -30,4 +30,16 @@ describe("VulnScope HTTPS edge redirects", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("location")).toBeNull();
   });
+
+  it("serves plain HTTP requests in the development environment", async () => {
+    // `wrangler dev` emulates the custom-domain host over plain HTTP, so the
+    // development environment must skip the HTTPS entry guard entirely.
+    const devEnv = { ...env, ENVIRONMENT: "development" } as unknown as Env;
+    const response = await worker.fetch(new Request("http://scan.illek.ie/api/health"), devEnv, ctx);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
+    const health = await response.json<{ ok: boolean; environment: string }>();
+    expect(health.ok).toBe(true);
+    expect(health.environment).toBe("development");
+  });
 });

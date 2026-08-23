@@ -48,7 +48,10 @@ export default {
     // Static assets are configured to run through this Worker first. Redirect
     // production HTTP requests before any API or asset handling so every path
     // (including assets and API endpoints) has one deterministic HTTPS hop.
-    if (url.protocol === "http:" && !isLocalDevelopmentHost(url.hostname)) {
+    // Local development skips the redirect: `wrangler dev` emulates the
+    // custom-domain host over plain HTTP, so an unconditional guard would
+    // 308-loop every local request. api/.dev.vars sets ENVIRONMENT=development.
+    if (env.ENVIRONMENT !== "development" && url.protocol === "http:" && !isLocalDevelopmentHost(url.hostname)) {
       url.protocol = "https:";
       return Response.redirect(url.toString(), 308);
     }
