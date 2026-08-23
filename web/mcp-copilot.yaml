@@ -3,9 +3,12 @@ info:
   title: VulnScope MCP
   description: Run bounded unauthenticated reconnaissance against authorised public websites and retrieve complete stored reports. Full REST and result schemas are at https://scan.illek.ie/openapi.yaml.
   version: 2.0.0
+  license:
+    name: Proprietary
 host: scan.illek.ie
 basePath: /
 schemes: [https]
+security: []
 paths:
   /mcp/v2:
     post:
@@ -18,3 +21,7 @@ paths:
       responses:
         '200': { description: MCP response }
         '202': { description: MCP notification accepted }
+        '400': { description: Invalid JSON or JSON-RPC request }
+        '403': { description: Browser origin is not allowed }
+        '405': { description: Method is not allowed }
+        '415': { description: Content-Type must be application/json }
