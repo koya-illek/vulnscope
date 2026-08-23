@@ -68,14 +68,20 @@ describe("bounded public outbound policy", () => {
       }),
     );
     globalThis.fetch = fetchMock;
+    const context = createOutboundContext();
 
     await expect(
-      infrastructureFetch("https://cloudflare-dns.com/dns-query", undefined),
+      infrastructureFetch("https://cloudflare-dns.com/dns-query", context),
     ).rejects.toThrow(/unexpected redirect/i);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://cloudflare-dns.com/dns-query",
       expect.objectContaining({ redirect: "manual" }),
     );
+    expect(context.budget.snapshot()).toMatchObject({
+      requestsAttempted: 1,
+      requestsSucceeded: 0,
+      requestsFailed: 1,
+    });
   });
 
   it("caps response bodies and records truncation", async () => {
@@ -96,6 +102,27 @@ describe("bounded public outbound policy", () => {
     expect(second).toEqual({ text: "", bytes: 0, truncated: true });
     expect(context.budget.bodyBytes).toBe(4);
     expect(context.budget.truncatedBodies).toBe(2);
+  });
+
+  it("caps a target request timeout at the remaining scan duration", async () => {
+    vi.spyOn(Date, "now")
+      .mockReturnValueOnce(1_000)
+      .mockReturnValue(1_600);
+    const timeout = vi.spyOn(AbortSignal, "timeout")
+      .mockReturnValue(new AbortController().signal);
+    const context = createOutboundContext(
+      { maxDurationMs: 1_000 },
+      { "example.com": ["93.184.216.34"] },
+    );
+    globalThis.fetch = vi.fn(async () => new Response("ok"));
+
+    await safeFetch("https://example.com", {
+      baseUrl: new URL("https://example.com"),
+      context,
+      timeoutMs: 5_000,
+    });
+
+    expect(timeout).toHaveBeenCalledWith(400);
   });
 });
 

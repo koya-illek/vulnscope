@@ -1,5 +1,5 @@
 import type { CorsResult, Finding } from "./types";
-import { safeFetch, USER_AGENT, type OutboundContext } from "./outbound";
+import { discardResponseBody, safeFetch, USER_AGENT, type OutboundContext } from "./outbound";
 import { redactUrlsInText } from "./security";
 
 const EVIL_ORIGIN = "https://evil.example";
@@ -123,10 +123,12 @@ async function fetchCors(
       timeoutMs: 5_000,
     });
 
-    return {
+    const result = {
       acao: redactUrlsInText(response.headers.get("access-control-allow-origin") || "") || null,
       acac: redactUrlsInText(response.headers.get("access-control-allow-credentials") || "") || null,
     };
+    await discardResponseBody(response);
+    return result;
   } catch {
     return { acao: null, acac: null };
   }

@@ -1,6 +1,6 @@
 import type { DnsAnswer, DnsQueryResult } from "./types";
 import { getDomain } from "tldts";
-import { infrastructureFetch, readBoundedBody, type OutboundContext } from "./outbound";
+import { discardResponseBody, infrastructureFetch, readBoundedBody, type OutboundContext } from "./outbound";
 
 const DOH_ENDPOINT = "https://cloudflare-dns.com/dns-query";
 const GOOGLE_DOH_ENDPOINT = "https://dns.google/resolve";
@@ -36,7 +36,10 @@ export async function queryDns(
       headers: { Accept: "application/dns-json" },
       signal: AbortSignal.timeout(5000),
     }, "dns");
-    if (!response.ok) throw new Error(`Resolver returned HTTP ${response.status}`);
+    if (!response.ok) {
+      await discardResponseBody(response);
+      throw new Error(`Resolver returned HTTP ${response.status}`);
+    }
     const payload = JSON.parse((await readBoundedBody(response, 64 * 1024, context, "dns")).text) as DnsJson;
     // do=true is sent to obtain the AD flag, which makes resolvers attach
     // RRSIG (type 46) signature records to every answer on signed zones.

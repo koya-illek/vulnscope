@@ -1,5 +1,5 @@
 import type { ExposedPath, SensitivePathEntry } from "./types";
-import { safeFetch, readBoundedBody, USER_AGENT, type OutboundContext } from "./outbound";
+import { discardResponseBody, safeFetch, readBoundedBody, USER_AGENT, type OutboundContext } from "./outbound";
 
 // ─── Sensitive path database ───────────────────────────────────────────────
 
@@ -219,7 +219,10 @@ async function probeSinglePath(
     });
 
     // Only consider 200 OK responses
-    if (response.status !== 200) return null;
+    if (response.status !== 200) {
+      await discardResponseBody(response);
+      return null;
+    }
 
     // Read first 10KB of body
     const bodyResult = await readBoundedBody(response, 10_240, context, "paths");

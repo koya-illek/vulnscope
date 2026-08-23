@@ -35,6 +35,7 @@ import type {
 } from "./types";
 import {
   createOutboundContext,
+  discardResponseBody,
   infrastructureFetch,
   phaseStats,
   readBoundedBody,
@@ -441,6 +442,7 @@ async function checkSubdomainTakeover(hostname: string, context?: OutboundContex
       "takeover",
     );
     if (!crtResponse.ok) {
+      await discardResponseBody(crtResponse);
       throw new Error(`Certificate Transparency lookup returned HTTP ${crtResponse.status}.`);
     }
     const entries = JSON.parse((await readBoundedBody(crtResponse, 256 * 1024, context, "takeover")).text) as Array<{ name_value: string }>;
@@ -627,6 +629,8 @@ async function extractJsBundles(
         if (response.ok) {
           const content = await readBoundedBody(response, 512 * 1024, context, "secrets"); // 512KB max per bundle
           bundles.push({ url, content: content.text });
+        } else {
+          await discardResponseBody(response);
         }
       } catch {
         // Skip failed fetches

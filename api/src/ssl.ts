@@ -1,5 +1,5 @@
 import type { SslDetail } from "./types";
-import { infrastructureFetch, readBoundedBody, type OutboundContext } from "./outbound";
+import { discardResponseBody, infrastructureFetch, readBoundedBody, type OutboundContext } from "./outbound";
 
 interface CrtShEntry {
   not_before?: string;
@@ -79,7 +79,10 @@ async function queryCrtSh(
     signal: AbortSignal.timeout(8_000),
   }, "certificateEvidence");
 
-  if (!response.ok) return null;
+  if (!response.ok) {
+    await discardResponseBody(response);
+    return null;
+  }
 
   const body = await readBoundedBody(response, 256 * 1024, context, "certificateEvidence");
   const entries = JSON.parse(body.text) as CrtShEntry[];

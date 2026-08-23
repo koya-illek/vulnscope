@@ -1,5 +1,5 @@
 import type { MethodResult } from "./types";
-import { safeFetch, readBoundedBody, USER_AGENT, type OutboundContext } from "./outbound";
+import { discardResponseBody, safeFetch, readBoundedBody, USER_AGENT, type OutboundContext } from "./outbound";
 
 const SCAN_TIMEOUT = 5000;
 const TRACE_CANARY_PREFIX = "VulnScanner-Trace";
@@ -73,6 +73,7 @@ async function checkOptions(targetUrl: string, context?: OutboundContext): Promi
     });
 
     const allowHeader = response.headers.get("allow") || "";
+    await discardResponseBody(response);
     if (!allowHeader) return [];
 
     const allowedMethods = allowHeader
@@ -130,6 +131,7 @@ async function checkTrace(
         vulnerable: false,
       };
     }
+    await discardResponseBody(response);
     return null;
   } catch {
     return null;

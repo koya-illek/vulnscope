@@ -1,5 +1,5 @@
 import type { WpFinding } from "./types";
-import { safeFetch, readBoundedBody, USER_AGENT, type OutboundContext } from "./outbound";
+import { discardResponseBody, safeFetch, readBoundedBody, USER_AGENT, type OutboundContext } from "./outbound";
 import { redactUrlsInText } from "./security";
 
 // ─── WordPress version check ───────────────────────────────────────────────
@@ -79,6 +79,8 @@ async function checkWpRestUsers(baseUrl: URL, context?: OutboundContext): Promis
           recommendation: "Restrict the WordPress REST API user endpoint or install a plugin that hides user enumeration.",
         });
       }
+    } else {
+      await discardResponseBody(response);
     }
   } catch { /* non-fatal */ }
   return findings;
@@ -103,6 +105,8 @@ async function checkWpRestApi(baseUrl: URL, context?: OutboundContext): Promise<
           recommendation: "If the REST API is not needed, disable it or restrict it to authenticated users.",
         });
       }
+    } else {
+      await discardResponseBody(response);
     }
   } catch { /* non-fatal */ }
   return findings;
@@ -118,6 +122,7 @@ async function checkAuthorEnumeration(baseUrl: URL, context?: OutboundContext): 
       }, false);
       // WordPress redirects /?author=N to /author/username/
       const location = response.headers.get("location") || "";
+      await discardResponseBody(response);
       if (response.status >= 301 && response.status <= 302 && location) {
         const userMatch = location.match(/\/author\/([^/?#]+)/i);
         if (userMatch) {
@@ -163,6 +168,8 @@ async function checkDirectoryListing(baseUrl: URL, path: string, name: string, c
           recommendation: `Disable directory listing for ${path} via .htaccess or server configuration.`,
         };
       }
+    } else {
+      await discardResponseBody(response);
     }
   } catch { /* non-fatal */ }
   return null;
@@ -187,6 +194,8 @@ async function checkReadme(baseUrl: URL, context?: OutboundContext): Promise<WpF
           recommendation: "Delete readme.html or restrict access to it.",
         };
       }
+    } else {
+      await discardResponseBody(response);
     }
   } catch { /* non-fatal */ }
   return null;
@@ -253,6 +262,8 @@ async function checkWpConfigBackups(baseUrl: URL, context?: OutboundContext): Pr
             recommendation: `Delete ${path} immediately and rotate all database credentials.`,
           } as WpFinding;
         }
+      } else {
+        await discardResponseBody(response);
       }
     } catch { /* non-fatal */ }
     return null;
@@ -293,6 +304,8 @@ async function checkDebugLog(baseUrl: URL, context?: OutboundContext): Promise<W
           recommendation: "Delete the debug log, disable WP_DEBUG_LOG, or restrict access via .htaccess.",
         };
       }
+    } else {
+      await discardResponseBody(response);
     }
   } catch { /* non-fatal */ }
   return null;

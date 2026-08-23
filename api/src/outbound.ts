@@ -81,7 +81,7 @@ export class OutboundBudget {
   }
 
   consume(phase?: PhaseStats): void {
-    if (this.elapsedMs > this.maxDurationMs) {
+    if (this.elapsedMs >= this.maxDurationMs) {
       this.requestsSkipped++;
       if (phase) phase.skipped++;
       throw new OutboundPolicyError("The scan time budget was exhausted.", "budget");
@@ -228,7 +228,7 @@ export async function safeFetch(input: RequestInfo | URL, options: SafeFetchOpti
     if (context) {
       context.budget.consume(stats);
       await context.budget.acquire();
-      if (context.budget.elapsedMs > context.budget.maxDurationMs || context.budget.bodyBytes >= context.budget.maxBodyBytes) {
+      if (context.budget.elapsedMs >= context.budget.maxDurationMs || context.budget.bodyBytes >= context.budget.maxBodyBytes) {
         context.budget.requestsSkipped++;
         if (stats) stats.skipped++;
         context.budget.release();
@@ -243,8 +243,12 @@ export async function safeFetch(input: RequestInfo | URL, options: SafeFetchOpti
 
     let response: Response;
     try {
-      const timeout = options.timeoutMs ?? 8_000;
-      const init: RequestInit = { ...options, redirect: "manual", signal: AbortSignal.timeout(timeout) };
+      const timeout = requestTimeout(options.timeoutMs ?? 8_000, context?.budget);
+      const deadlineSignal = AbortSignal.timeout(timeout);
+      const signal = options.signal
+        ? AbortSignal.any([options.signal, deadlineSignal])
+        : deadlineSignal;
+      const init: RequestInit = { ...options, redirect: "manual", signal };
       delete (init as SafeFetchOptions).baseUrl;
       delete (init as SafeFetchOptions).allowCrossHost;
       delete (init as SafeFetchOptions).followRedirects;
@@ -306,7 +310,7 @@ export async function infrastructureFetch(
   if (context) {
     context.budget.consume(stats);
     await context.budget.acquire();
-    if (context.budget.elapsedMs > context.budget.maxDurationMs || context.budget.bodyBytes >= context.budget.maxBodyBytes) {
+    if (context.budget.elapsedMs >= context.budget.maxDurationMs || context.budget.bodyBytes >= context.budget.maxBodyBytes) {
       context.budget.requestsSkipped++;
       if (stats) stats.skipped++;
       context.budget.release();
@@ -319,10 +323,15 @@ export async function infrastructureFetch(
     }
   }
   try {
+    const timeout = requestTimeout(8_000, context?.budget);
+    const deadlineSignal = AbortSignal.timeout(timeout);
+    const signal = init.signal
+      ? AbortSignal.any([init.signal, deadlineSignal])
+      : deadlineSignal;
     const response = await fetch(input, {
       ...init,
       redirect: "manual",
-      signal: init.signal || AbortSignal.timeout(8_000),
+      signal,
     });
     if (response.status >= 300 && response.status < 400) {
       await response.body?.cancel();
@@ -343,6 +352,15 @@ export async function infrastructureFetch(
     throw error;
   } finally {
     context?.budget.release();
+  }
+}
+
+/** Release an unread response without making cleanup failures affect a scan. */
+export async function discardResponseBody(response: Response): Promise<void> {
+  try {
+    await response.body?.cancel();
+  } catch {
+    // The response may already be consumed or locked by the runtime.
   }
 }
 
@@ -470,4 +488,9 @@ function redactOutboundUrl(url: URL): string {
   copy.search = "";
   copy.hash = "";
   return copy.toString();
+}
+
+function requestTimeout(configuredMs: number, budget?: OutboundBudget): number {
+  if (!budget) return configuredMs;
+  return Math.max(1, Math.min(configuredMs, budget.maxDurationMs - budget.elapsedMs));
 }
