@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "check": "npm run typecheck && npm test && npm run check:web",
+    "check:web": "node --check ../web/app.js && node --check ../web/report-view.js",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "smoke:production": "node scripts/production-smoke.mjs",

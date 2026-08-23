@@ -9,8 +9,8 @@ storage, probe-budget, deployment, and third-party service design.
 
 The public beta applies one outbound policy to the initial URL, redirects,
 scripts, WordPress checks, CORS probes, methods, and takeover evidence. A scan
-allows at most 46 outbound requests, six concurrent target connections, a
-25-second request-wide deadline, and bounded response bodies. Sensitive path
+allows at most 46 outbound requests, six concurrent outbound connections, a
+25-second outbound-work deadline, and bounded response bodies. Sensitive path
 and takeover phases are opt-in and report partial coverage when the safe
 budget is exhausted.
 Reports are opaque bearer links: anyone with the report ID can read an
@@ -38,7 +38,8 @@ version `2025-11-25` and publish `scan_website` plus
 
 ## Release checks
 
-From `api/`, run `npm run typecheck`, `npm test`, and `npm run smoke:production`.
+From `api/`, run `npm run check` and `npm run smoke:production`. The local
+check covers TypeScript, unit and contract tests, and browser JavaScript syntax.
 The production smoke confirms DNS resolution, a measured main GET, the NDJSON
 error contract, and the explicit same-Worker self-scan boundary.
 

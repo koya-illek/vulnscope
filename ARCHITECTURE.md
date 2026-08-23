@@ -1,6 +1,6 @@
 # VulnScope architecture
 
-Last reviewed: 2026-08-22
+Last reviewed: 2026-08-23
 
 VulnScope is a bounded external-exposure scanner for authorised public websites. It collects non-destructive HTTP, DNS, header, method, CORS, technology, script, WordPress, sensitive-path, certificate-transparency, and takeover evidence, while making coverage and skipped work explicit.
 
@@ -59,11 +59,11 @@ flowchart LR
 | Analyzer | Orchestrates the initial fetch and all enabled phases, normalizes phase status, and builds the report | `api/src/analyzer.ts` |
 | DNS engine | Uses independent DNS-over-HTTPS providers and preserves resolver states | `api/src/dns.ts` |
 | Header and cookie checks | Evaluates browser-facing security headers and cookie attributes without retaining cookie values | `api/src/headers-audit.ts`, `api/src/cookies.ts` |
-| Method and CORS checks | Sends bounded non-destructive requests and interprets observable policy behavior | `api/src/methods.ts`, `api/src/cors.ts` |
+| Method and CORS checks | Sends bounded non-destructive requests and interprets each response's policy without combining headers from separate observations | `api/src/methods.ts`, `api/src/cors.ts` |
 | Sensitive-path engine | Runs an opt-in bounded catalogue with content-type, multi-marker, and soft-404 controls | `api/src/paths.ts` |
 | WordPress checks | Runs bounded public WordPress observations | `api/src/wordpress.ts` |
 | Evidence scrubbing | Detects and redacts URL, response, and accidental secret material | `api/src/secrets.ts` |
-| Scoring | Converts findings and phase coverage into grade, score, and summary | `api/src/scorer.ts` |
+| Scoring | Converts findings and phase coverage into a grade and severity summary | `api/src/scorer.ts` |
 | MCP adapter | Publishes two typed tools over stateless JSON-RPC HTTP | `api/src/mcp.ts` |
 | Report UI | Starts scans, renders progress, filters evidence, and renders retrieved reports | `web/app.js`, `web/report-view.js` |
 
@@ -76,7 +76,7 @@ flowchart LR
 5. The analyzer captures bounded body and header evidence from the public web response.
 6. Core phases evaluate headers, cookies, methods, CORS, technology, public scripts, WordPress signals, and certificate-transparency history.
 7. Sensitive-path and takeover phases run only when explicitly enabled. They use the same safe outbound layer and remaining request budget.
-8. Each phase records measured, partial, failed, unavailable, or skipped state plus attempted, successful, failed, byte, truncation, and timing evidence.
+8. Each phase records measured, partial, failed, unavailable, or skipped state plus attempted, successful, failed, byte, and truncation evidence.
 9. The scorer prevents a clean grade when requested coverage failed or remained partial.
 10. URL credentials, query values, fragments, cookie values, signed URLs, and URL-bearing evidence are removed before persistence.
 11. The report is written to D1 under an opaque identifier and returned through JSON, NDJSON, the report UI, or MCP.
@@ -86,8 +86,8 @@ flowchart LR
 A scan is constrained to:
 
 - 46 outbound requests
-- six concurrent target connections
-- 25 seconds of request-wide elapsed time
+- six concurrent outbound connections
+- 25 seconds for outbound work, with each request timeout capped at the remaining duration
 - 2 MiB aggregate response-body inspection
 - 256 KiB for the primary page body
 - bounded per-phase bodies and redirect depth
@@ -163,8 +163,8 @@ VulnScope does not exploit targets, submit forms, authenticate, crawl arbitrary 
 
 ## Verification map
 
-- Type safety: `cd api && npm run typecheck`
-- Unit and contract suite: `cd api && npm test`
+- Type safety, unit and contract suite, and browser JavaScript syntax: `cd api && npm run check`
+- Read-only production smoke: `cd api && npm run smoke:production`
 - Threat model: `THREAT_MODEL.md`
 - REST schema: `web/openapi.yaml`
 - MCP connector schema: `web/mcp-copilot.yaml`
