@@ -164,8 +164,9 @@ VulnScope does not exploit targets, submit forms, authenticate, crawl arbitrary 
 
 ## Verification map
 
-- Type safety, unit and contract suite, and browser JavaScript syntax: `cd api && npm run check`
-- Read-only production smoke: `cd api && npm run smoke:production`
+- Type safety, unit and contract suite, browser JavaScript syntax, dependency audit, and Worker dry run: `cd api && npm run verify:release`
+- Read-only production shell, API, redirect, and MCP smoke: `cd api && npm run smoke:production`
+- Mutating end-to-end scan and report smoke, with release-owner approval: `cd api && npm run smoke:production:scan`
 - Threat model: `THREAT_MODEL.md`
 - REST schema: `web/openapi.yaml`
 - MCP connector schema: `web/mcp-copilot.yaml`

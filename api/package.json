@@ -9,7 +9,9 @@
     "check:web": "node --check ../web/app.js && node --check ../web/report-view.js",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "verify:release": "npm run check && npm audit --audit-level=low && wrangler deploy --dry-run --outdir ../dist/wrangler-dry-run",
     "smoke:production": "node scripts/production-smoke.mjs",
+    "smoke:production:scan": "node scripts/production-scan-smoke.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

@@ -1,71 +1,78 @@
-const baseUrl = process.env.VULNSCOPE_BASE_URL || "https://scan.illek.ie";
-const successfulTarget =
-  process.env.VULNSCOPE_SMOKE_TARGET ||
-  `https://example.com/?vulnscope-smoke=${Date.now()}`;
+import { pathToFileURL } from "node:url";
+
+const defaultBaseUrl = process.env.VULNSCOPE_BASE_URL || "https://scan.illek.ie";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-async function post(path, target) {
-  return fetch(new URL(path, baseUrl), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      url: target,
-      probePaths: false,
-      checkTakeover: false,
-    }),
-  });
+function assertHeader(response, name, expected) {
+  const value = response.headers.get(name) || "";
+  assert(expected.test(value), `${name} was ${JSON.stringify(value)}`);
 }
 
-const health = await fetch(new URL("/api/health", baseUrl));
-assert(health.ok, `Health returned HTTP ${health.status}`);
-const healthBody = await health.json();
-assert(healthBody.ok === true, "Health payload was not healthy");
+export async function runReadOnlySmoke(baseUrl = defaultBaseUrl) {
+  const base = new URL(baseUrl);
+  const origin = base.origin;
 
-const selfScan = await post("/api/v2/scan", baseUrl);
-const selfBody = await selfScan.json();
-assert(selfScan.status === 403, `Self-scan returned HTTP ${selfScan.status}`);
-assert(
-  String(selfBody.error).includes("cannot scan its own hostname"),
-  "Self-scan did not return the explicit Worker boundary",
-);
+  const shell = await fetch(new URL("/", base), { redirect: "manual" });
+  assert(shell.status === 200, `Public shell returned HTTP ${shell.status}`);
+  assertHeader(shell, "Content-Type", /^text\/html\b/i);
+  assertHeader(shell, "Strict-Transport-Security", /\bmax-age=/i);
+  assertHeader(shell, "Content-Security-Policy", /\bdefault-src\b/i);
+  assertHeader(shell, "X-Content-Type-Options", /^nosniff$/i);
 
-const scan = await post("/api/v2/scan", successfulTarget);
-assert(scan.status === 201, `Target scan returned HTTP ${scan.status}`);
-const report = await scan.json();
-assert(report.status === "complete", `Target scan status was ${report.status}`);
-assert(
-  report.coverage?.dns?.status === "measured" &&
-    report.dns?.addresses?.length > 0,
-  "Target scan did not confirm public DNS",
-);
-assert(
-  report.coverage?.mainFetch?.status === "measured",
-  `Main fetch was ${report.coverage?.mainFetch?.status || "missing"}`,
-);
-assert(
-  report.summary?.grade !== "INCOMPLETE",
-  "A fully measured target scan remained ungraded",
-);
+  const health = await fetch(new URL("/api/health", base));
+  assert(health.ok, `Health returned HTTP ${health.status}`);
+  const healthBody = await health.json();
+  assert(healthBody.ok === true, "Health payload was not healthy");
 
-const stream = await post("/api/scans/stream", baseUrl);
-assert(stream.ok, `Stream endpoint returned HTTP ${stream.status}`);
-const events = (await stream.text())
-  .split("\n")
-  .filter(Boolean)
-  .map((line) => JSON.parse(line));
-assert(
-  events.some(
-    (event) =>
-      event.type === "error" &&
-      event.status === 403 &&
-      String(event.error).includes("cannot scan its own hostname"),
-  ),
-  "Stream endpoint did not preserve the self-scan boundary",
-);
+  const metadata = await fetch(new URL("/api/v2", base));
+  assert(metadata.ok, `API metadata returned HTTP ${metadata.status}`);
+  const metadataBody = await metadata.json();
+  assert(typeof metadataBody.version === "string", "API metadata omitted its version");
+  assertHeader(metadata, "X-Robots-Tag", /\bnoindex\b/i);
 
-console.log(
-  `VulnScope production smoke passed at ${baseUrl}: DNS ${report.dns.addresses.length} addresses, main GET measured, grade ${report.summary.grade}, self-scan blocked explicitly.`,
-);
+  const mcp = await fetch(new URL("/mcp/v2", base), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: origin },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: "read-only-smoke",
+      method: "initialize",
+      params: { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "vulnscope-smoke", version: "1" } },
+    }),
+  });
+  assert(mcp.ok, `MCP initialize returned HTTP ${mcp.status}`);
+  const mcpBody = await mcp.json();
+  assert(mcpBody.result?.protocolVersion === "2025-11-25", "MCP returned an unexpected protocol version");
+  assert(mcp.headers.get("Access-Control-Allow-Origin") === origin, "MCP initialize omitted its allowed origin");
+  assertHeader(mcp, "Cache-Control", /\bno-store\b/i);
+  assertHeader(mcp, "X-Robots-Tag", /\bnoindex\b/i);
+
+  const preflight = await fetch(new URL("/mcp/v2", base), {
+    method: "OPTIONS",
+    headers: {
+      Origin: origin,
+      "Access-Control-Request-Method": "POST",
+      "Access-Control-Request-Headers": "content-type",
+    },
+  });
+  assert(preflight.status === 204, `MCP preflight returned HTTP ${preflight.status}`);
+  assert(preflight.headers.get("Access-Control-Allow-Origin") === origin, "MCP preflight omitted its allowed origin");
+
+  if (base.protocol === "https:") {
+    const insecure = new URL(base);
+    insecure.protocol = "http:";
+    const redirect = await fetch(insecure, { redirect: "manual" });
+    assert(redirect.status === 308, `HTTP entry returned HTTP ${redirect.status}`);
+    const location = new URL(redirect.headers.get("Location") || "", insecure);
+    assert(location.protocol === "https:" && location.host === base.host, "HTTP entry did not redirect to the canonical HTTPS host");
+  }
+
+  console.log(`VulnScope read-only production smoke passed at ${origin}, API ${metadataBody.version}, MCP ${mcpBody.result.protocolVersion}.`);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await runReadOnlySmoke();
+}

@@ -44,10 +44,17 @@ version `2025-11-25` and publish `scan_website` plus
 
 ## Release checks
 
-From `api/`, run `npm run check` and `npm run smoke:production`. The local
-check covers TypeScript, unit and contract tests, and browser JavaScript syntax.
-The production smoke confirms DNS resolution, a measured main GET, the NDJSON
-error contract, and the explicit same-Worker self-scan boundary.
+From `api/`, run `npm run verify:release`. It covers TypeScript, unit and
+contract tests, browser JavaScript syntax, the dependency audit, and a
+Cloudflare deployment dry run. The repository CI runs the same command for
+every push and pull request.
+
+After deployment, run `npm run smoke:production`. It checks the public shell,
+security headers, health and API metadata, HTTP-to-HTTPS redirect, and MCP
+initialisation and CORS without creating a scan or writing a report. The
+separate `npm run smoke:production:scan` command creates a real target scan and
+stores a production report. Run that mutating check only with release-owner
+approval.
 
 ## Local development
 
