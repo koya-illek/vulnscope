@@ -2,6 +2,8 @@ openapi: 3.0.3
 info:
   title: VulnScope API
   version: 2.0.0
+  license:
+    name: Proprietary
   description: |
     Bounded, unauthenticated reconnaissance for authorised public websites.
     No authentication is currently required. VulnScope observes public responses
@@ -9,6 +11,7 @@ info:
     certify a target as secure. Only scan systems you own or are authorised to test.
 servers:
   - url: https://scan.illek.ie
+security: []
 x-ai-usage:
   preferred-interface: REST or JSON MCP
   mcp-endpoint: https://scan.illek.ie/mcp/v2
@@ -41,7 +44,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ScanReport' }
         '400': { $ref: '#/components/responses/BadRequest' }
-        '403': { description: Target is disallowed, non-public, or failed SSRF validation }
+        '403': { description: 'Target is disallowed, non-public, or failed SSRF validation' }
         '429': { $ref: '#/components/responses/RateLimited' }
   /api/scans/stream:
     post:
@@ -59,7 +62,7 @@ paths:
                 type: string
                 description: One JSON object per line with type progress, result, or error.
         '400': { $ref: '#/components/responses/BadRequest' }
-        '403': { description: Target is disallowed, non-public, or failed SSRF validation }
+        '403': { description: 'Target is disallowed, non-public, or failed SSRF validation' }
         '429': { $ref: '#/components/responses/RateLimited' }
   /api/scans/{reportId}:
     get:

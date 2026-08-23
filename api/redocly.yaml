@@ -1,0 +1,6 @@
+extends:
+  - recommended
+
+rules:
+  # VulnScope is proprietary and has no public licence document to link.
+  info-license-strict: off

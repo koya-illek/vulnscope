@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "npm run typecheck && npm test && npm run check:web",
+    "check": "npm run typecheck && npm test && npm run check:web && npm run check:openapi",
+    "check:openapi": "redocly lint ../web/openapi.yaml",
     "check:web": "node --check ../web/app.js && node --check ../web/report-view.js",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
@@ -14,6 +15,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260823.1",
+    "@redocly/cli": "^2.47.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4",
     "wrangler": "^4.125.0"
