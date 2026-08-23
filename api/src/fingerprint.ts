@@ -38,9 +38,17 @@ export function fingerprint(
     cms = { name: "Ghost", version: null };
   } else if (/cdn\.shopify\.com|shopify\.theme/i.test(html)) {
     cms = { name: "Shopify", version: null };
-  } else if (/squarespace|static1\.squarespace\.com/i.test(html)) {
+  } else if (
+    // Structural asset markers only: bare "squarespace" appears in ordinary
+    // comparison articles and reviews.
+    /static1\.squarespace\.com|squarespace-cdn\.com|assets\.squarespace\.com/i.test(html)
+  ) {
     cms = { name: "Squarespace", version: null };
-  } else if (/wix\.com|wixstatic/i.test(html)) {
+  } else if (
+    // A bare wix.com link proves nothing about the page itself; these are
+    // Wix asset hostnames present in pages actually built with Wix.
+    /wixstatic|static\.parastorage\.com/i.test(html)
+  ) {
     cms = { name: "Wix", version: null };
   }
 
@@ -54,9 +62,13 @@ export function fingerprint(
     framework = { name: "React", version: null };
   } else if (/data-v-[a-z0-9]{8}|vue\.runtime/i.test(html)) {
     framework = { name: "Vue.js", version: null };
-  } else if (/ng-version|_ngcontent|angular/i.test(html)) {
+  } else if (/\bng-version=|_ngcontent|\bng-app[\s=>]/i.test(html)) {
+    // Rendered-output markers only: bare "angular" appears in ordinary tech
+    // prose. ng-version/_ngcontent are emitted by Angular builds; ng-app
+    // covers AngularJS 1.x bootstrap attributes.
     framework = { name: "Angular", version: null };
-  } else if (/gatsby|___gatsby/i.test(html)) {
+  } else if (/___gatsby|\/page-data\/|gatsby-image-wrapper/i.test(html)) {
+    // Gatsby build-output markers; bare "gatsby" also names a famous novel.
     framework = { name: "Gatsby", version: null };
   }
 

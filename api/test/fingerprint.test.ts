@@ -68,3 +68,44 @@ describe("fingerprint CMS detection", () => {
     expect(withoutVersion.findings).toEqual([]);
   });
 });
+
+describe("fingerprint framework detection", () => {
+  it("does not detect frameworks or CMSes from prose or links that merely mention them", () => {
+    const html = `
+      <article><h1>The Great Gatsby</h1>
+      <p>Fitzgerald published The Great Gatsby in 1925.</p>
+      <p>We compared Angular against Squarespace before moving off Wix.com;
+      our Angular migration guide explains the rest.</p>
+      <a href="https://www.wix.com/">Wix.com</a></article>`;
+    const { result } = fingerprint(htmlHeaders(), html);
+    expect(result.cms).toBeNull();
+    expect(result.framework).toBeNull();
+  });
+
+  it("detects Angular from rendered-output markers only", () => {
+    const ngVersion = fingerprint(htmlHeaders(), `<app-root ng-version="17.3.0"></app-root>`);
+    expect(ngVersion.result.framework?.name).toBe("Angular");
+    const ngContent = fingerprint(htmlHeaders(), `<p _ngcontent-ng-c123=""></p>`);
+    expect(ngContent.result.framework?.name).toBe("Angular");
+  });
+
+  it("detects Gatsby from build-output markers", () => {
+    const html = `<div id="___gatsby"><div class="gatsby-image-wrapper"></div></div>`;
+    const { result } = fingerprint(htmlHeaders(), html);
+    expect(result.framework?.name).toBe("Gatsby");
+  });
+
+  it("detects Squarespace and Wix from their asset hostnames", () => {
+    const squarespace = fingerprint(
+      htmlHeaders(),
+      `<script src="https://static1.squarespace.com/static/site-css.css"></script>`,
+    );
+    expect(squarespace.result.cms?.name).toBe("Squarespace");
+
+    const wix = fingerprint(
+      htmlHeaders(),
+      `<link rel="icon" href="https://static.wixstatic.com/media/favicon.ico">`,
+    );
+    expect(wix.result.cms?.name).toBe("Wix");
+  });
+});
