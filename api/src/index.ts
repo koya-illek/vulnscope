@@ -11,6 +11,7 @@ import {
 } from "./security";
 import type { Env, OutboundRequestSummary, ScanCoverage, ScanReport } from "./types";
 import { handleMcp } from "./mcp";
+import { deriveDailyQuotaKey } from "./quota";
 
 const API_VERSION = "2.0.0";
 const REPORT_SCHEMA_VERSION = 2;
@@ -362,8 +363,12 @@ function enforceRateLimit(request: Request, env: Env, quota: QuotaPolicy): Promi
 async function enforceScopedDailyRateLimit(request: Request, env: Env, scope: string, limit: number, label: string): Promise<void> {
   const date = new Date().toISOString().slice(0, 10);
   const ip = request.headers.get("CF-Connecting-IP") || "local";
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${date}:${ip}`));
-  const key = `${scope}:${[...new Uint8Array(digest)].slice(0, 16).map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+  const key = await deriveDailyQuotaKey({
+    scope,
+    date,
+    clientAddress: ip,
+    secret: env.RATE_LIMIT_HMAC_KEY,
+  });
   const now = new Date().toISOString();
   const row = await env.DB.prepare(`
     INSERT INTO rate_limits (client_key, window_date, request_count, updated_at)

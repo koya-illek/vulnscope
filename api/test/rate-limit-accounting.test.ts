@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import worker, { scanQuotaPolicy } from "../src/index";
+import { deriveDailyQuotaKey } from "../src/quota";
 import type { Env } from "../src/types";
 
 const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
@@ -12,6 +13,7 @@ function envWithDb(prepare: ReturnType<typeof vi.fn>): Env {
     REPORT_RETENTION_DAYS: "14",
     DAILY_SCAN_LIMIT: "50",
     MCP_DAILY_LIMIT: "200",
+    RATE_LIMIT_HMAC_KEY: "test-only-rate-limit-hmac-key-32-bytes",
     ENVIRONMENT: "test",
   };
 }
@@ -82,5 +84,38 @@ describe("quota scope selection", () => {
     const wild = { ...env, DAILY_SCAN_LIMIT: "-5", MCP_DAILY_LIMIT: "99999" } as unknown as Env;
     expect(scanQuotaPolicy(wild, "web").limit).toBe(1);
     expect(scanQuotaPolicy(wild, "mcp").limit).toBe(1000);
+  });
+});
+
+describe("quota client identifiers", () => {
+  const base = {
+    scope: "scan",
+    date: "2026-08-23",
+    clientAddress: "203.0.113.7",
+    secret: "test-only-rate-limit-hmac-key-32-bytes",
+  };
+
+  it("derives a stable versioned HMAC identifier", async () => {
+    await expect(deriveDailyQuotaKey(base)).resolves.toBe(
+      "scan:v2:b1e29011a38e4d6e33407f9e9b033796",
+    );
+  });
+
+  it("separates addresses, dates, scopes, and deployment secrets", async () => {
+    const original = await deriveDailyQuotaKey(base);
+    const variants = await Promise.all([
+      deriveDailyQuotaKey({ ...base, clientAddress: "203.0.113.8" }),
+      deriveDailyQuotaKey({ ...base, date: "2026-08-24" }),
+      deriveDailyQuotaKey({ ...base, scope: "mcp" }),
+      deriveDailyQuotaKey({ ...base, secret: "different-test-rate-limit-key-32-bytes" }),
+    ]);
+
+    expect(new Set([original, ...variants])).toHaveLength(5);
+  });
+
+  it("rejects missing or weak deployment keys", async () => {
+    await expect(deriveDailyQuotaKey({ ...base, secret: "too-short" })).rejects.toThrow(
+      "RATE_LIMIT_HMAC_KEY must contain at least 32 UTF-8 bytes.",
+    );
   });
 });

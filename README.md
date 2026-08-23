@@ -20,6 +20,12 @@ caching, and remove cookie values plus query and fragment components from
 stored URL evidence. Read [THREAT_MODEL.md](./THREAT_MODEL.md) before
 operating a deployment.
 
+Daily quota identifiers use a scope-specific HMAC and never store the source
+IP address. Before the first production deployment, generate a random secret
+of at least 32 bytes and store it with
+`cd api && npx wrangler secret put RATE_LIMIT_HMAC_KEY`. Do not put the
+production value in `wrangler.toml` or `.dev.vars`.
+
 ## Agent integrations
 
 ```text

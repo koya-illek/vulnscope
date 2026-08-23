@@ -114,7 +114,7 @@ MCP publishes `scan_website` and `get_vulnscope_report`.
 | Service | Use | Data sent | Required |
 | --- | --- | --- | --- |
 | Cloudflare Workers and Assets | Runtime, routing, static site, observability, and Cron | Normal service request metadata | Yes |
-| Cloudflare D1 | Scan reports, expiry metadata, and durable quota state | Redacted report JSON, opaque IDs, timestamps, one-way client fingerprints | Yes for report sharing |
+| Cloudflare D1 | Scan reports, expiry metadata, and durable quota state | Redacted report JSON, opaque IDs, timestamps, and daily scope-specific HMAC client fingerprints | Yes for report sharing |
 | Cloudflare DNS over HTTPS | Public-target validation and DNS evidence | Hostname and record type | Yes |
 | Google Public DNS | Fallback public-target validation when the primary resolver transport fails | Hostname and record type | Yes |
 | `crt.sh` | Best-effort certificate-transparency names and history | Target hostname or constrained subdomain query | Conditional |
@@ -131,6 +131,7 @@ VulnScope has no CVE feed, malware reputation service, browser-rendering service
 - Report and export responses use private, no-store caching.
 - Valid report reads, recent-scan cache hits, and MCP negotiation, discovery, and notifications do not write durable quota state.
 - Web scans and MCP `scan_website` calls charge separate per-IP daily buckets (`DAILY_SCAN_LIMIT` scope `scan`, `MCP_DAILY_LIMIT` scope `mcp`) through the same atomic counter, so one caller class cannot exhaust the other's allowance.
+- D1 stores a versioned HMAC of the quota scope, UTC date, and source IP. `RATE_LIMIT_HMAC_KEY` is a managed Worker secret with at least 32 bytes and is not stored in repository configuration. Rotating it resets the current day's counters.
 - Anyone holding an unexpired report identifier can retrieve the report.
 
 ## Security boundaries

@@ -326,6 +326,7 @@ export interface Env {
   REPORT_RETENTION_DAYS: string;
   DAILY_SCAN_LIMIT: string;
   MCP_DAILY_LIMIT: string;
+  RATE_LIMIT_HMAC_KEY: string;
   MAX_PATH_PROBES?: string;
   MAX_SCAN_SUBREQUESTS?: string;
   MAX_SCAN_CONCURRENCY?: string;
