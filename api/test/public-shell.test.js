@@ -25,6 +25,7 @@ describe("public shell", () => {
     expect(headers).toMatch(/style-src 'self';/);
     expect(headers).not.toContain("'unsafe-inline'");
     expect(headers).toContain("object-src 'none'");
+    expect(headers).not.toContain("cloudflareinsights.com");
     expect(html).not.toMatch(/class="(?:eyebrow|section-kicker)"/);
     expect(html).not.toContain("—");
   });
