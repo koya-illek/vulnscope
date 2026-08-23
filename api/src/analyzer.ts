@@ -426,17 +426,21 @@ function addressAnswers(queries: Awaited<ReturnType<typeof inspectDns>>): string
 }
 
 async function checkSubdomainTakeover(hostname: string, context?: OutboundContext): Promise<NonNullable<ScanReport["takeover"]>> {
-  // Query DNS for CNAME records that might point to dangling services
+  // Query DNS for CNAME records that might point to dangling services.
+  // Provider failures must propagate so coverage records failed work instead
+  // of a measured zero; only an empty-but-valid CT answer is legitimate.
   const results: NonNullable<ScanReport["takeover"]> = [];
 
-  try {
+  {
     const crtResponse = await infrastructureFetch(
       `https://crt.sh/?q=${encodeURIComponent(`%.${hostname}`)}&output=json`,
       context,
       { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(8000) },
       "takeover",
     );
-    if (!crtResponse.ok) return results;
+    if (!crtResponse.ok) {
+      throw new Error(`Certificate Transparency lookup returned HTTP ${crtResponse.status}.`);
+    }
     const entries = JSON.parse((await readBoundedBody(crtResponse, 256 * 1024, context, "takeover")).text) as Array<{ name_value: string }>;
     const targetDomain = getDomain(hostname, { allowPrivateDomains: true });
     const subdomains = [...new Set(
@@ -515,8 +519,6 @@ async function checkSubdomainTakeover(hostname: string, context?: OutboundContex
         // Skip individual subdomain errors
       }
     }
-  } catch {
-    // crt.sh failure is non-fatal
   }
 
   return results;
