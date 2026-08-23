@@ -174,6 +174,23 @@ describe("VulnScope report presentation contract", () => {
     expect(rows.some((row) => row.value.includes("credentialed CORS theft"))).toBe(false);
   });
 
+  it("does not combine CORS headers from different responses", () => {
+    const rows = corsAuditRows({
+      testedOrigin: "https://evil.example",
+      acaoGet: "https://evil.example",
+      acaoOptions: null,
+      acacGet: null,
+      acacOptions: "true",
+      reflectsOrigin: true,
+      wildcardWithCredentials: false,
+    });
+
+    expect(rows.find((row) => row.label === "Arbitrary-origin reflection")).toMatchObject({
+      value: "YES",
+      statusClass: "warn",
+    });
+  });
+
   it("distinguishes measured empty, skipped, and failed path coverage", () => {
     expect(exposedPathsState([], { paths: { status: "measured", detail: "0 exposures" } })).toEqual({
       status: "measured",

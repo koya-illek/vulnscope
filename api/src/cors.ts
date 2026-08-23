@@ -36,10 +36,16 @@ export async function testCors(
 
   const reflectsOrigin =
     acaoGet === EVIL_ORIGIN || acaoOptions === EVIL_ORIGIN;
-  const isWildcard = acaoGet === "*" || acaoOptions === "*";
-  const credentialsAllowed =
-    /true/i.test(acacGet || "") || /true/i.test(acacOptions || "");
-  const wildcardWithCredentials = isWildcard && credentialsAllowed;
+  const getAllowsCredentials = /^true$/i.test(acacGet || "");
+  const optionsAllowsCredentials = /^true$/i.test(acacOptions || "");
+  // CORS policy is evaluated on one response. Combining ACAO from GET with
+  // ACAC from OPTIONS, or the reverse, fabricates a policy no browser saw.
+  const reflectedWithCredentials =
+    (acaoGet === EVIL_ORIGIN && getAllowsCredentials) ||
+    (acaoOptions === EVIL_ORIGIN && optionsAllowsCredentials);
+  const wildcardWithCredentials =
+    (acaoGet === "*" && getAllowsCredentials) ||
+    (acaoOptions === "*" && optionsAllowsCredentials);
 
   const vulnerable = reflectsOrigin || wildcardWithCredentials;
 
@@ -51,8 +57,6 @@ export async function testCors(
   // - Wildcard ACAO with ACAC true is refused by browsers for credentialed
   //   requests, so it cannot be exploited as-is; it stays high as evidence of
   //   broken CORS intent but does not claim demonstrated credential theft.
-  const reflectedWithCredentials = reflectsOrigin && credentialsAllowed && !isWildcard;
-
   if (reflectsOrigin) {
     findings.push({
       id: "cors-origin-reflection",

@@ -55,15 +55,26 @@
   function corsAuditRows(cors) {
     const testedOrigin = typeof cors?.testedOrigin === "string" ? cors.testedOrigin : "";
     const acaoValues = [cors?.acaoGet, cors?.acaoOptions].filter((value) => typeof value === "string");
-    const credentialsAllowed = [cors?.acacGet, cors?.acacOptions].some((value) => /true/i.test(String(value || "")));
+    const getAllowsCredentials = /^true$/i.test(String(cors?.acacGet || ""));
+    const optionsAllowsCredentials = /^true$/i.test(String(cors?.acacOptions || ""));
     // Prefer the explicit schema-v2 booleans, but derive them from the
     // observed headers for older stored reports that only have header values.
     const reflectsOrigin = cors?.reflectsOrigin === true || Boolean(testedOrigin && acaoValues.includes(testedOrigin));
-    const wildcardWithCredentials = cors?.wildcardWithCredentials === true || (acaoValues.includes("*") && credentialsAllowed);
+    const recordedHeaders = [cors?.acaoGet, cors?.acaoOptions, cors?.acacGet, cors?.acacOptions]
+      .some((value) => typeof value === "string");
+    const wildcardWithCredentialsFromHeaders =
+      (cors?.acaoGet === "*" && getAllowsCredentials) ||
+      (cors?.acaoOptions === "*" && optionsAllowsCredentials);
+    const wildcardWithCredentials = recordedHeaders
+      ? wildcardWithCredentialsFromHeaders
+      : cors?.wildcardWithCredentials === true;
     // Display severity tracks the repriced findings: credentialed reflection
     // is high; bare reflection only exposes public data; wildcard plus ACAC
     // is refused by browsers for credentialed requests.
-    const reflectedSeverity = credentialsAllowed && !wildcardWithCredentials ? "high" : "warn";
+    const reflectedWithCredentials =
+      (cors?.acaoGet === testedOrigin && getAllowsCredentials) ||
+      (cors?.acaoOptions === testedOrigin && optionsAllowsCredentials);
+    const reflectedSeverity = reflectedWithCredentials ? "high" : "warn";
     const rows = [
       ["Origin tested", cors?.testedOrigin || "Not recorded", ""],
       ["Access-Control-Allow-Origin (GET)", cors?.acaoGet || "Not set", cors?.acaoGet === "*" ? "warn" : ""],
