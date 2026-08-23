@@ -22,6 +22,7 @@
   const errorPanel = $("#error-panel");
   const reportPanel = $("#report");
   const methodDialog = $("#method-dialog");
+  let methodDialogReturnFocus = null;
 
   // Stage order mirrors the backend pipeline: recon/dns/fetch/ssl, then
   // headers/cookies, fingerprint, paths, then cors/secrets/wordpress/methods/
@@ -65,15 +66,27 @@
     runScan(input.value);
   });
   $("#new-scan").addEventListener("click", () => reset());
-  $("#error-close").addEventListener("click", () => errorPanel.classList.add("hidden"));
+  $("#error-close").addEventListener("click", () => {
+    errorPanel.classList.add("hidden");
+    input.focus();
+  });
   $("#copy-link").addEventListener("click", copyShareLink);
   $("#export-json").addEventListener("click", exportJson);
-  $("#method-button").addEventListener("click", () => methodDialog.showModal());
-  $("#footer-method-button").addEventListener("click", () => methodDialog.showModal());
+  $("#method-button").addEventListener("click", (event) => openMethodDialog(event.currentTarget));
+  $("#footer-method-button").addEventListener("click", (event) => openMethodDialog(event.currentTarget));
   $("#dialog-close").addEventListener("click", () => methodDialog.close());
   methodDialog.addEventListener("click", (event) => {
     if (event.target === methodDialog) methodDialog.close();
   });
+  methodDialog.addEventListener("close", () => {
+    methodDialogReturnFocus?.focus();
+    methodDialogReturnFocus = null;
+  });
+
+  function openMethodDialog(trigger) {
+    methodDialogReturnFocus = trigger;
+    methodDialog.showModal();
+  }
 
   $$(".filter").forEach((button) => {
     button.setAttribute("aria-pressed", String(button.classList.contains("active")));
@@ -208,9 +221,9 @@
     $("#progress-title").textContent = event.message || "Scanning target";
     const reportedProgress = Number(event.progress);
     const progress = Number.isFinite(reportedProgress)
-      ? Math.max(Number.parseFloat($("#progress-bar").style.width) || 8, reportedProgress)
+      ? Math.max(Number($("#progress-track").value) || 8, reportedProgress)
       : 10 + (state.progressStep / 5) * 85;
-    $("#progress-bar").style.width = `${Math.min(100, progress)}%`;
+    $("#progress-track").value = Math.min(100, progress);
     updateProgressSteps();
   }
 
@@ -226,7 +239,7 @@
     state.progressStep = 0;
     $("#progress-title").textContent = title;
     progressPanel.classList.remove("hidden");
-    $("#progress-bar").style.width = "8%";
+    $("#progress-track").value = 8;
     updateProgressSteps();
     scrollToElement(progressPanel, "center");
   }
@@ -249,7 +262,7 @@
   function finishProgress() {
     state.progressStep = 5;
     updateProgressSteps();
-    $("#progress-bar").style.width = "100%";
+    $("#progress-track").value = 100;
     setTimeout(() => progressPanel.classList.add("hidden"), 250);
   }
 
@@ -518,8 +531,8 @@
       </div>`;
     }).join("");
 
-    const header = `<div class="path-row" style="border-bottom-color:var(--line-bright);color:var(--muted);font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:.08em;">
-      <span>Path</span><span>Status</span><span style="text-align:right">Severity</span><span>Evidence</span>
+    const header = `<div class="path-row path-table-header">
+      <span>Path</span><span>Status</span><span class="path-header-severity">Severity</span><span>Evidence</span>
     </div>`;
 
     $("#paths-details").innerHTML = header + rows;

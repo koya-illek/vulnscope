@@ -92,6 +92,7 @@ a { color: inherit; }
   font-weight: 800;
   letter-spacing: -.04em;
   font-size: 20px;
+  min-height: 44px;
 }
 .brand > span:last-child span { color: var(--accent); }
 .brand-mark { width: 26px; height: 26px; display: grid; align-content: center; gap: 3px; }
@@ -261,8 +262,19 @@ input:focus-visible,
 .route-wire.active i { opacity: 1; animation: packet 1s cubic-bezier(.45,0,.55,1) infinite; }
 .route-wire.done { background: rgba(255, 118, 87, .5); }
 @keyframes packet { from { left: -5px; } to { left: calc(100% - 1px); } }
-.progress-track { height: 2px; margin: 28px 0 20px; background: var(--line); }
-.progress-track i { display: block; height: 100%; width: 8%; background: var(--accent); transition: width .5s ease; box-shadow: 0 0 12px var(--accent); }
+.progress-track {
+  display: block;
+  width: 100%;
+  height: 2px;
+  margin: 28px 0 20px;
+  appearance: none;
+  border: 0;
+  background: var(--line);
+  color: var(--accent);
+}
+.progress-track::-webkit-progress-bar { background: var(--line); }
+.progress-track::-webkit-progress-value { background: var(--accent); box-shadow: 0 0 12px var(--accent); transition: width .5s ease; }
+.progress-track::-moz-progress-bar { background: var(--accent); box-shadow: 0 0 12px var(--accent); transition: width .5s ease; }
 .progress-steps { display: flex; justify-content: space-between; padding: 0; margin: 0; list-style: none; color: var(--muted-2); font: 400 11px/1 var(--mono); }
 .progress-steps li.active { color: var(--accent); }
 .progress-steps li.done { color: var(--text); }
@@ -560,6 +572,15 @@ input:focus-visible,
   font: 400 10px/1.4 var(--mono);
 }
 .path-row:last-child { border-bottom: 0; }
+.path-table-header {
+  border-bottom-color: var(--line-bright);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.path-header-severity { text-align: right; }
 .path-url { color: var(--text); overflow-wrap: anywhere; }
 .path-status { font: 500 11px/1 var(--mono); }
 .path-status.s-critical { color: var(--critical); }

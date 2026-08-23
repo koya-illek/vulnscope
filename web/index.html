@@ -34,7 +34,7 @@
     </a>
     <nav aria-label="Primary navigation">
       <button class="text-button" id="method-button" type="button">Methodology</button>
-      <a class="status-link" href="#status"><span></span> Scanner ready</a>
+      <a class="status-link" href="#status"><span></span> Scanning principles</a>
     </nav>
   </header>
 
@@ -112,7 +112,7 @@
         <div class="route-wire"><i></i></div>
         <div class="route-node" data-stage="5"><span>06</span><strong>REPORT</strong></div>
       </div>
-      <div class="progress-track"><i id="progress-bar"></i></div>
+      <progress class="progress-track" id="progress-track" aria-label="Scan progress" max="100" value="0">0%</progress>
       <ol class="progress-steps" id="progress-steps">
         <li class="active">Reconnaissance</li>
         <li>Security headers</li>
@@ -138,7 +138,7 @@
           <h2 id="report-host" tabindex="-1">example.com</h2>
           <a id="report-url" href="#" target="_blank" rel="noopener noreferrer"></a>
           <p class="report-meta" id="report-meta" aria-live="polite"></p>
-          <p class="report-privacy-warning">The report link is public until expiry. Share it only with approved reviewers.</p>
+          <p class="report-privacy-warning">Anyone with this link can view the report until it expires. Share it only with approved reviewers.</p>
         </div>
         <div class="report-actions">
           <button class="secondary-button" id="copy-link" type="button">Copy share link</button>
@@ -229,8 +229,8 @@
       <h2 class="visually-hidden">Scanning principles</h2>
       <div class="principle-grid">
         <article><span>01</span><h3>Unauthenticated only</h3><p>Every check runs without credentials, showing what an external attacker can see.</p></article>
-        <article><span>02</span><h3>Evidence-backed</h3><p>Every finding includes the raw HTTP response or configuration that revealed it.</p></article>
-        <article><span>03</span><h3>Safe by default</h3><p>Private targets, non-standard ports, and exploitation attempts are blocked.</p></article>
+        <article><span>02</span><h3>Evidence-backed</h3><p>Each finding includes the observed header, response signature, or request result that supports it.</p></article>
+        <article><span>03</span><h3>Bounded checks</h3><p>Request, concurrency, response-body, and time limits constrain each scan. Private targets and non-standard ports are blocked.</p></article>
       </div>
     </section>
 
