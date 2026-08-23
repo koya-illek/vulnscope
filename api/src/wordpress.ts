@@ -2,47 +2,6 @@ import type { WpFinding } from "./types";
 import { discardResponseBody, safeFetch, readBoundedBody, USER_AGENT, type OutboundContext } from "./outbound";
 import { redactUrlsInText } from "./security";
 
-// ─── WordPress version check ───────────────────────────────────────────────
-
-/**
- * Version-threshold ladder for detected WordPress installs. A maintained
- * vulnerability feed is out of scope for a static Worker deployment, so these
- * cutoffs are deliberately conservative and hedged: older lines are described
- * as unsupported/accumulating public vulnerabilities, newer-but-dated lines
- * only claim they lag current releases.
- */
-const VERSION_THRESHOLDS: Array<{ max: string; severity: WpFinding["severity"]; reason: string }> = [
-  { max: "4.0", severity: "high", reason: "WordPress versions below 4.0 have numerous known vulnerabilities including XSS, SQL injection, and RCE." },
-  { max: "5.0", severity: "high", reason: "WordPress versions below 5.0 have multiple known XSS and CSRF vulnerabilities." },
-  { max: "6.0", severity: "high", reason: "WordPress 5.x no longer receives security support and has accumulated publicly documented vulnerabilities since its release." },
-  { max: "6.5", severity: "medium", reason: "This WordPress release line is several major releases behind current versions and may be missing recent security fixes." },
-];
-
-/**
- * Compare two dot-separated version strings.
- * Returns negative if a < b, positive if a > b, 0 if equal.
- */
-function compareVersions(a: string, b: string): number {
-  const aParts = a.split(".").map(Number);
-  const bParts = b.split(".").map(Number);
-  const maxLen = Math.max(aParts.length, bParts.length);
-  for (let i = 0; i < maxLen; i++) {
-    const aVal = aParts[i] ?? 0;
-    const bVal = bParts[i] ?? 0;
-    if (aVal < bVal) return -1;
-    if (aVal > bVal) return 1;
-  }
-  return 0;
-}
-
-/**
- * Extract WordPress version from the HTML meta generator tag.
- */
-function extractWordPressVersion(html: string): string | null {
-  const match = html.match(/name=["']generator["']\s+content=["']WordPress\s+([\d.]+)/i);
-  return match ? match[1] : null;
-}
-
 // ─── Individual checks ─────────────────────────────────────────────────────
 
 const SCAN_TIMEOUT = 5000;
@@ -318,28 +277,9 @@ async function checkDebugLog(baseUrl: URL, context?: OutboundContext): Promise<W
  */
 export async function scanWordPress(
   pageUrl: URL,
-  html: string,
   context?: OutboundContext,
 ): Promise<WpFinding[]> {
   const findings: WpFinding[] = [];
-
-  // --- Version disclosure from meta generator tag ---
-  const wpVersion = extractWordPressVersion(html);
-  if (wpVersion) {
-    for (const threshold of VERSION_THRESHOLDS) {
-      if (compareVersions(wpVersion, threshold.max) < 0) {
-        findings.push({
-          check: "wp-version-vulnerable",
-          severity: threshold.severity,
-          title: `WordPress ${wpVersion} Is Outdated`,
-          detail: `WordPress version ${wpVersion} is outdated. ${threshold.reason}`,
-          evidence: `Generator meta tag: WordPress ${wpVersion} (below ${threshold.max})`,
-          recommendation: "Update WordPress to the latest version.",
-        });
-        break;
-      }
-    }
-  }
 
   // --- Run all network checks in parallel ---
   const [restUsers, restApi, authorEnum, readme, xmlrpc, configBackups, debugLog, uploadsListing, pluginsListing, themesListing] = await Promise.allSettled([

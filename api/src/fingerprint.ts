@@ -98,24 +98,12 @@ export function fingerprint(
   if (cms && cms.version) {
     findings.push({
       id: "fingerprint-cms-version-exposed",
-      severity: "low",
+      severity: "info",
       category: "fingerprint",
-      title: `${cms.name} Version Exposed`,
-      detail: `The ${cms.name} version (${cms.version}) is publicly visible in the page source. Attackers can use this to find known vulnerabilities.`,
+      title: `${cms.name} Version Observed`,
+      detail: `The page generator metadata reports ${cms.name} ${cms.version}. VulnScope has not matched this version to a maintained advisory source.`,
       evidence: `Generator meta tag reveals ${cms.name} ${cms.version}`,
-      recommendation: "Remove or obscure the generator meta tag in your CMS configuration.",
-    });
-  }
-
-  if (server && /\d/.test(server)) {
-    findings.push({
-      id: "fingerprint-server-version",
-      severity: "medium",
-      category: "fingerprint",
-      title: "Server Software Version Exposed",
-      detail: `The Server header reveals specific software version: ${server}.`,
-      evidence: `Server: ${server}`,
-      recommendation: "Configure the web server to hide version information.",
+      recommendation: "Use a maintained advisory source to confirm whether this version needs an update.",
     });
   }
 

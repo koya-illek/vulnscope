@@ -290,7 +290,7 @@ export async function analyzeUrl(
   let wpFindings: WpFinding[] = [];
   if (status !== "failed" && fingerprintResult.cms?.name === "WordPress" && response) {
     setOutboundPhase(outbound, "wordpress");
-    wpFindings = await scanWordPress(initial, bodyText, outbound);
+    wpFindings = await scanWordPress(initial, outbound);
     coverage.wordpress = phaseCoverage(outbound, "wordpress", `WordPress checks completed with ${wpFindings.length} finding(s).`, true);
     emit({ stage: "wordpress", message: `WordPress scan: ${wpFindings.length} findings` });
   } else {

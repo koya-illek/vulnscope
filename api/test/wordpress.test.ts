@@ -42,47 +42,8 @@ describe("scanWordPress", () => {
 
   it("returns empty array when no WordPress issues are found", async () => {
     globalThis.fetch = mockFetch({});
-    const results = await scanWordPress(
-      new URL("https://example.com"),
-      '<html><head></head><body></body></html>',
-    );
+    const results = await scanWordPress(new URL("https://example.com"));
     expect(results).toEqual([]);
-  });
-
-  it("detects WordPress version from meta generator tag", async () => {
-    globalThis.fetch = mockFetch({});
-    const html = '<meta name="generator" content="WordPress 3.9.1">';
-    const results = await scanWordPress(new URL("https://example.com"), html);
-    const versionFinding = results.find((r) => r.check === "wp-version-vulnerable");
-    expect(versionFinding).toBeTruthy();
-    expect(versionFinding!.severity).toBe("high");
-    expect(versionFinding!.title).toContain("3.9.1");
-  });
-
-  it("does not flag a current WordPress version", async () => {
-    globalThis.fetch = mockFetch({});
-    const html = '<meta name="generator" content="WordPress 6.5.2">';
-    const results = await scanWordPress(new URL("https://example.com"), html);
-    const versionFinding = results.find((r) => r.check === "wp-version-vulnerable");
-    expect(versionFinding).toBeFalsy();
-  });
-
-  it("flags unsupported 5.x releases as high severity", async () => {
-    globalThis.fetch = mockFetch({});
-    const html = '<meta name="generator" content="WordPress 5.4.1">';
-    const results = await scanWordPress(new URL("https://example.com"), html);
-    const versionFinding = results.find((r) => r.check === "wp-version-vulnerable");
-    expect(versionFinding).toBeTruthy();
-    expect(versionFinding!.severity).toBe("high");
-  });
-
-  it("flags dated 6.x releases as medium severity", async () => {
-    globalThis.fetch = mockFetch({});
-    const html = '<meta name="generator" content="WordPress 6.4.2">';
-    const results = await scanWordPress(new URL("https://example.com"), html);
-    const versionFinding = results.find((r) => r.check === "wp-version-vulnerable");
-    expect(versionFinding).toBeTruthy();
-    expect(versionFinding!.severity).toBe("medium");
   });
 
   it("detects user enumeration via REST API", async () => {
@@ -95,7 +56,7 @@ describe("scanWordPress", () => {
         ]),
       },
     });
-    const results = await scanWordPress(new URL("https://example.com"), "");
+    const results = await scanWordPress(new URL("https://example.com"));
     const userEnum = results.find((r) => r.check === "wp-rest-users");
     expect(userEnum).toBeTruthy();
     expect(userEnum!.severity).toBe("medium");
@@ -109,7 +70,7 @@ describe("scanWordPress", () => {
         body: JSON.stringify({ name: "Test Site", description: "Just another WordPress site", namespaces: ["wp/v2"] }),
       },
     });
-    const results = await scanWordPress(new URL("https://example.com"), "");
+    const results = await scanWordPress(new URL("https://example.com"));
     const restApi = results.find((r) => r.check === "wp-rest-api");
     expect(restApi).toBeTruthy();
     expect(restApi!.severity).toBe("low");
@@ -122,7 +83,7 @@ describe("scanWordPress", () => {
         body: "<html><body>Version 6.2<br>WordPress</body></html>",
       },
     });
-    const results = await scanWordPress(new URL("https://example.com"), "");
+    const results = await scanWordPress(new URL("https://example.com"));
     const readme = results.find((r) => r.check === "wp-readme");
     expect(readme).toBeTruthy();
     expect(readme!.severity).toBe("low");
@@ -136,7 +97,7 @@ describe("scanWordPress", () => {
         body: "XML-RPC server accepts POST requests only.",
       },
     }, observedCalls);
-    const results = await scanWordPress(new URL("https://example.com"), "");
+    const results = await scanWordPress(new URL("https://example.com"));
     const xmlrpc = results.find((r) => r.check === "wp-xmlrpc");
     expect(xmlrpc).toBeTruthy();
     expect(xmlrpc!.severity).toBe("medium");
@@ -154,7 +115,7 @@ describe("scanWordPress", () => {
         body: "<?php\ndefine('DB_PASSWORD', 'secret');\ndefine('DB_USER', 'root');\n$table_prefix = 'wp_';",
       },
     });
-    const results = await scanWordPress(new URL("https://example.com"), "");
+    const results = await scanWordPress(new URL("https://example.com"));
     const configBackup = results.find((r) => r.check === "wp-config-backup-/wp-config.txt");
     expect(configBackup).toBeTruthy();
     expect(configBackup!.severity).toBe("critical");
@@ -167,7 +128,7 @@ describe("scanWordPress", () => {
         body: "[04-Jan-2024 06:12:00 UTC] PHP Warning: some error\n[04-Jan-2024 06:12:01 UTC] PHP Stack trace:\n",
       },
     });
-    const results = await scanWordPress(new URL("https://example.com"), "");
+    const results = await scanWordPress(new URL("https://example.com"));
     const debugLog = results.find((r) => r.check === "wp-debug-log");
     expect(debugLog).toBeTruthy();
     expect(debugLog!.severity).toBe("medium");
@@ -181,7 +142,7 @@ describe("scanWordPress", () => {
         body: "PHP Fatal error: Uncaught Error: Call to undefined function",
       },
     });
-    const results = await scanWordPress(new URL("https://example.com"), "");
+    const results = await scanWordPress(new URL("https://example.com"));
     expect(results.find((r) => r.check === "wp-debug-log")).toBeTruthy();
   });
 
@@ -192,7 +153,7 @@ describe("scanWordPress", () => {
         body: "<!doctype html><html><head><title>Page not found</title></head><body><h1>Sorry, an Error occurred</h1><p>Warning: the page you requested was not found.</p></body></html>",
       },
     });
-    const results = await scanWordPress(new URL("https://example.com"), "");
+    const results = await scanWordPress(new URL("https://example.com"));
     expect(results.find((r) => r.check === "wp-debug-log")).toBeFalsy();
   });
 
@@ -203,7 +164,7 @@ describe("scanWordPress", () => {
         body: "<html><head><title>Index of /wp-content/uploads/</title></head></html>",
       },
     });
-    const results = await scanWordPress(new URL("https://example.com"), "");
+    const results = await scanWordPress(new URL("https://example.com"));
     const dirListing = results.find((r) => r.check === "wp-dir-listing-uploads");
     expect(dirListing).toBeTruthy();
     expect(dirListing!.severity).toBe("medium");
@@ -216,7 +177,7 @@ describe("scanWordPress", () => {
         body: "<html><head><title>Index of /wp-content/plugins/</title></head></html>",
       },
     });
-    const results = await scanWordPress(new URL("https://example.com"), "");
+    const results = await scanWordPress(new URL("https://example.com"));
     const dirListing = results.find((r) => r.check === "wp-dir-listing-plugins");
     expect(dirListing).toBeTruthy();
   });
@@ -235,7 +196,7 @@ describe("scanWordPress", () => {
       return Promise.resolve(new Response("Not Found", { status: 404 }));
     });
 
-    const results = await scanWordPress(new URL("https://example.com"), "");
+    const results = await scanWordPress(new URL("https://example.com"));
     const authorEnum = results.find((r) => r.check === "wp-author-enum");
     expect(authorEnum).toBeTruthy();
     expect(authorEnum!.severity).toBe("medium");
@@ -251,7 +212,7 @@ describe("scanWordPress", () => {
         body: JSON.stringify([{ id: 1, slug: "admin" }]),
       },
     });
-    const results = await scanWordPress(new URL("https://example.com"), "");
+    const results = await scanWordPress(new URL("https://example.com"));
     expect(results.length).toBeGreaterThan(0);
     for (const finding of results) {
       const w: WpFinding = finding;

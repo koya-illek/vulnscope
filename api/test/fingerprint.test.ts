@@ -59,13 +59,22 @@ describe("fingerprint CMS detection", () => {
       htmlHeaders(),
       `<meta name="generator" content="WordPress 5.9">`,
     );
-    expect(withVersion.findings.some((f) => f.id === "fingerprint-cms-version-exposed")).toBe(true);
+    const versionFinding = withVersion.findings.find((finding) => finding.id === "fingerprint-cms-version-exposed");
+    expect(versionFinding?.severity).toBe("info");
+    expect(versionFinding?.detail).not.toMatch(/outdated|unsupported|vulnerable/i);
 
     const withoutVersion = fingerprint(
       htmlHeaders(),
       `<link rel="stylesheet" href="/wp-content/style.css">`,
     );
     expect(withoutVersion.findings).toEqual([]);
+  });
+
+  it("records server software without duplicating the header-audit finding", () => {
+    const observed = fingerprint(htmlHeaders({ Server: "nginx/1.24.0" }), "");
+
+    expect(observed.result.server).toBe("nginx/1.24.0");
+    expect(observed.findings.some((finding) => finding.id === "fingerprint-server-version")).toBe(false);
   });
 });
 

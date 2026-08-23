@@ -21,6 +21,7 @@ VulnScope is an open beta for bounded external exposure evidence. It is not an e
 | False CORS severity from unrelated response headers | GET and OPTIONS headers remain separate; credentialed reflection and wildcard-policy checks require ACAO and ACAC on the same response | CORS observations do not prove that a sensitive endpoint returns readable data |
 | Public report secret disclosure | Cookie values are removed, script source queries are stripped, URL-bearing header evidence is redacted, and reports use private no-store caching | Existing reports created before this release require retention expiry or manual review |
 | Sensitive-path false positives | Empty signatures removed, multi-marker matching, structured key formats, content-type checks, and soft-404 comparison | Heuristics remain observations and need corpus expansion before broader catalogues |
+| Stale WordPress vulnerability claims | CMS versions remain informational fingerprints; the scanner has no static version-to-severity table | Operators must use a maintained advisory source to assess the observed version |
 | Takeover false positives | A and AAAA checks, resolver-state distinction, registrable-domain filtering, provider signatures, and non-critical confidence | Provider ownership cannot be proven from CT and HTTP alone |
 | Agent contract confusion | REST documents synchronous JSON and NDJSON separately; MCP returns JSON-RPC and bounded input; phase status is explicit | Older clients may still assume the former SSE description |
 

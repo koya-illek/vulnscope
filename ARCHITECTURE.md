@@ -122,6 +122,7 @@ MCP publishes `scan_website` and `get_vulnscope_report`.
 | `tldts` | Local registrable-domain and public-suffix handling | No external service call | Local dependency |
 
 VulnScope has no CVE feed, malware reputation service, browser-rendering service, port scanner, exploit engine, or credential integration.
+Detected CMS versions remain fingerprint evidence. VulnScope does not grade a WordPress version as vulnerable without a maintained advisory source.
 
 ## Storage and retention
 
