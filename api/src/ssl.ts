@@ -7,7 +7,7 @@ interface CrtShEntry {
 }
 
 /**
- * Extract SSL/TLS connection and certificate details for a hostname.
+ * Extract certificate-transparency evidence for a hostname.
  *
  * Cloudflare Worker fetches do not expose the scanned origin's negotiated TLS
  * protocol or cipher. Those fields therefore remain unavailable. Certificate
@@ -16,11 +16,8 @@ interface CrtShEntry {
  */
 export async function inspectSsl(
   hostname: string,
-  _fetchResponse: Response | null,
   context?: OutboundContext,
 ): Promise<SslDetail> {
-  void _fetchResponse;
-
   // --- 1. Query crt.sh for certificate-transparency evidence ---
   let validFrom: string | null = null;
   let validTo: string | null = null;

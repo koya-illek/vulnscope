@@ -81,9 +81,6 @@ export function fingerprint(
     if (/servlet/i.test(poweredBy)) languages.push("Java");
   }
   if (server) {
-    if (/nginx/i.test(server)) {
-      if (!languages.includes("C")) languages.push("C"); // nginx is C, not a language per se
-    }
     if (/microsoft-iis/i.test(server) && !languages.includes("ASP.NET")) {
       languages.push("ASP.NET");
     }
@@ -96,9 +93,6 @@ export function fingerprint(
   if (/connect\.sid/i.test(setCookie) && !languages.some((l) => l.includes("Node.js"))) {
     languages.push("Node.js");
   }
-
-  // Remove the C placeholder we used for nginx — not useful in the output
-  const filteredLanguages = languages.filter((l) => l !== "C");
 
   // --- Findings ---
   if (cms && cms.version) {
@@ -130,7 +124,7 @@ export function fingerprint(
     poweredBy,
     cms,
     framework,
-    languages: filteredLanguages,
+    languages,
   };
 
   return { result, findings };

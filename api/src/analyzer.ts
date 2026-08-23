@@ -193,7 +193,7 @@ export async function analyzeUrl(
 
   // --- SSL ---
   setOutboundPhase(outbound, "certificateEvidence");
-  const ssl: SslDetail = await inspectSsl(initial.hostname, response, outbound);
+  const ssl: SslDetail = await inspectSsl(initial.hostname, outbound);
   coverage.tlsProtocolCipher = {
     status: "unavailable",
     detail: "Origin TLS protocol/cipher was not assessed because Cloudflare Worker fetches do not expose the scanned origin's negotiated TLS protocol or cipher, and no active TLS probe was run.",
