@@ -55,13 +55,13 @@ describe("testCors", () => {
     const { result, findings } = await testCors("https://example.com");
     expect(result.reflectsOrigin).toBe(false);
     expect(result.wildcardWithCredentials).toBe(true);
-    expect(result.vulnerable).toBe(true);
+    expect(result.vulnerable).toBe(false);
     // Browsers refuse credentialed requests alongside a wildcard origin, so
     // the finding documents broken intent rather than demonstrated theft.
     expect(findings).toHaveLength(1);
     expect(findings[0]).toMatchObject({
       id: "cors-wildcard-credentials",
-      severity: "high",
+      severity: "low",
     });
     expect(findings[0].detail).toContain("not exploitable as-is");
   });

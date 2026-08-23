@@ -82,7 +82,7 @@
       ["Access-Control-Allow-Credentials (GET)", cors?.acacGet || "Not set", ""],
       ["Access-Control-Allow-Credentials (OPTIONS)", cors?.acacOptions || "Not set", ""],
       ["Arbitrary-origin reflection", reflectsOrigin ? "YES" : "No", reflectsOrigin ? reflectedSeverity : "good"],
-      ["Wildcard + credentials", wildcardWithCredentials ? "YES" : "No", wildcardWithCredentials ? "high" : "good"],
+      ["Wildcard + credentials", wildcardWithCredentials ? "YES" : "No", wildcardWithCredentials ? "warn" : "good"],
     ];
     return rows.map(([label, value, statusClass]) => ({ label, value, statusClass }));
   }

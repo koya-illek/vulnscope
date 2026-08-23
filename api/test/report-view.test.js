@@ -156,7 +156,7 @@ describe("VulnScope report presentation contract", () => {
     });
 
     expect(rows.find((row) => row.label === "Arbitrary-origin reflection")).toMatchObject({ value: "No", statusClass: "good" });
-    expect(rows.find((row) => row.label === "Wildcard + credentials")).toMatchObject({ value: "YES", statusClass: "high" });
+    expect(rows.find((row) => row.label === "Wildcard + credentials")).toMatchObject({ value: "YES", statusClass: "warn" });
   });
 
   it("derives reflection and credential state from headers in legacy CORS fixtures", () => {

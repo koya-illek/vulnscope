@@ -47,7 +47,7 @@ export async function testCors(
     (acaoGet === "*" && getAllowsCredentials) ||
     (acaoOptions === "*" && optionsAllowsCredentials);
 
-  const vulnerable = reflectsOrigin || wildcardWithCredentials;
+  const vulnerable = reflectsOrigin;
 
   // Severity follows browser-enforced exploitability, not header presence:
   // - Origin reflection plus Access-Control-Allow-Credentials true lets an
@@ -55,8 +55,7 @@ export async function testCors(
   // - Reflection without credentials only exposes what any visitor can read
   //   publicly — medium.
   // - Wildcard ACAO with ACAC true is refused by browsers for credentialed
-  //   requests, so it cannot be exploited as-is; it stays high as evidence of
-  //   broken CORS intent but does not claim demonstrated credential theft.
+  //   requests. It is an invalid policy signal, not a demonstrated exposure.
   if (reflectsOrigin) {
     findings.push({
       id: "cors-origin-reflection",
@@ -74,12 +73,12 @@ export async function testCors(
   if (wildcardWithCredentials) {
     findings.push({
       id: "cors-wildcard-credentials",
-      severity: "high",
+      severity: "low",
       category: "cors",
-      title: "CORS Wildcard Origin with Credentials Allowed",
+      title: "Invalid CORS Wildcard and Credentials Combination",
       detail: "The server returns Access-Control-Allow-Origin: * AND allows credentials. Browsers refuse to attach credentials to wildcard-origin responses, so this combination is not exploitable as-is, but it signals a misunderstood CORS policy and should be corrected before credentials are ever honored.",
       evidence: `ACAO: *, ACAC: true`,
-      recommendation: "Never combine Access-Control-Allow-Origin: * with Access-Control-Allow-Credentials: true.",
+      recommendation: "Remove Access-Control-Allow-Credentials, or replace the wildcard with an explicit allowlist when credentialed cross-origin access is required.",
     });
   }
 
