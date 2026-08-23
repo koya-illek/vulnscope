@@ -69,8 +69,13 @@ export async function handleMcp(
   if (!["scan_website", "get_vulnscope_report"].includes(String(params.name))) return rpcError(id, -32602, "Unknown tool name");
   const args = params.arguments && typeof params.arguments === "object" ? params.arguments as Record<string, unknown> : {};
   if (params.name === "get_vulnscope_report") {
+    if (Object.keys(args).some((key) => key !== "reportId")) return rpcError(id, -32602, "get_vulnscope_report received an unsupported argument");
     if (typeof args.reportId !== "string") return rpcError(id, -32602, "get_vulnscope_report requires reportId");
-  } else if (typeof args.url !== "string") return rpcError(id, -32602, "scan_website requires a URL");
+  } else {
+    const scanKeys = new Set(["url", "probePaths", "checkTakeover"]);
+    if (Object.keys(args).some((key) => !scanKeys.has(key))) return rpcError(id, -32602, "scan_website received an unsupported argument");
+    if (typeof args.url !== "string") return rpcError(id, -32602, "scan_website requires a URL");
+  }
   if (args.probePaths !== undefined && typeof args.probePaths !== "boolean") return rpcError(id, -32602, "probePaths must be a boolean");
   if (args.checkTakeover !== undefined && typeof args.checkTakeover !== "boolean") return rpcError(id, -32602, "checkTakeover must be a boolean");
 

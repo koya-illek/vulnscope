@@ -50,6 +50,21 @@ describe("VulnScope MCP", () => {
     expect(body.result.structuredContent.summary.grade).toBe("A");
   });
 
+  it("rejects arguments outside the published tool schema", async () => {
+    const execute = vi.fn(async () => report);
+    const response = await handleMcp(rpc("tools/call", {
+      name: "scan_website",
+      arguments: { url: "https://example.com", unexpected: true },
+    }), execute);
+    const body = await response.json<{ error: { code: number; message: string } }>();
+
+    expect(body.error).toEqual({
+      code: -32602,
+      message: "scan_website received an unsupported argument",
+    });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it("acknowledges notifications and rejects GET streams", async () => {
     expect((await handleMcp(rpc("notifications/initialized", {}, undefined), async () => report)).status).toBe(202);
     expect((await handleMcp(new Request("https://scan.illek.ie/mcp"), async () => report)).status).toBe(405);

@@ -216,7 +216,17 @@ async function readScanInput(request: Request): Promise<ScanInput> {
   }
   if (!parsed || typeof parsed !== "object") throw new InputError("JSON request body must be an object.");
   const body = parsed as Record<string, unknown>;
+  const allowedKeys = new Set(["url", "probePaths", "checkTakeover"]);
+  if (Object.keys(body).some((key) => !allowedKeys.has(key))) {
+    throw new InputError("JSON request body contains an unsupported field.");
+  }
   if (typeof body.url !== "string") throw new InputError("A URL is required.");
+  if (body.probePaths !== undefined && typeof body.probePaths !== "boolean") {
+    throw new InputError("probePaths must be a boolean.");
+  }
+  if (body.checkTakeover !== undefined && typeof body.checkTakeover !== "boolean") {
+    throw new InputError("checkTakeover must be a boolean.");
+  }
   return {
     url: body.url,
     probePaths: body.probePaths === true,
