@@ -1,6 +1,6 @@
 # VulnScope architecture
 
-Last reviewed: 2026-08-15
+Last reviewed: 2026-08-22
 
 VulnScope is a bounded external-exposure scanner for authorised public websites. It collects non-destructive HTTP, DNS, header, method, CORS, technology, script, WordPress, sensitive-path, certificate-transparency, and takeover evidence, while making coverage and skipped work explicit.
 
