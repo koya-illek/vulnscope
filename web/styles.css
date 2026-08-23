@@ -699,7 +699,8 @@ dialog h2 { margin: 0 0 30px; font-size: 32px; letter-spacing: -.04em; }
   .hero { padding: 62px 0 54px; }
   h1 { font-size: clamp(48px, 16vw, 76px); }
   .input-shell { height: auto; grid-template-columns: auto 1fr; }
-  .input-shell input { height: 64px; padding-right: 12px; font-size: 14px; }
+  /* 16px floor: iOS Safari auto-zooms any smaller focused input. */
+  .input-shell input { height: 64px; padding-right: 12px; font-size: 16px; }
   .scan-submit-row { align-items: stretch; flex-direction: column; gap: 8px; }
   .scan-submit-help { text-align: left; }
   .scan-submit { width: 100%; }
