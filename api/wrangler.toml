@@ -1,6 +1,11 @@
 name = "vuln-scanner-api"
 main = "src/index.ts"
 compatibility_date = "2026-07-23"
+# Route every target fetch through Cloudflare's public front door. Without
+# this, Workers on illek.ie routes are bypassed and their origin can return
+# 403, leaving an otherwise valid scan ungraded. The API rejects self-scans
+# before outbound work, so scan.illek.ie cannot loop back into itself.
+compatibility_flags = ["global_fetch_strictly_public"]
 workers_dev = false
 preview_urls = false
 
