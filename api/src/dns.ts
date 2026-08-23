@@ -38,7 +38,14 @@ export async function queryDns(
     }, "dns");
     if (!response.ok) throw new Error(`Resolver returned HTTP ${response.status}`);
     const payload = JSON.parse((await readBoundedBody(response, 64 * 1024, context, "dns")).text) as DnsJson;
-    const answers: DnsAnswer[] = (payload.Answer || []).map((answer) => ({
+    // do=true is sent to obtain the AD flag, which makes resolvers attach
+    // RRSIG (type 46) signature records to every answer on signed zones.
+    // Those base64 signatures carry no review value in a report — DNSSEC
+    // evidence is preserved by authenticatedData — so they are dropped here
+    // instead of stored per query.
+    const answers: DnsAnswer[] = (payload.Answer || [])
+      .filter((answer) => answer.type !== 46)
+      .map((answer) => ({
       name: answer.name.replace(/\.$/, ""),
       type: TYPE_NAMES[answer.type] || String(answer.type),
       ttl: answer.TTL,

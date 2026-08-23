@@ -53,6 +53,29 @@ describe("DNS resolver fallback", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("drops RRSIG signature records while keeping the address evidence", async () => {
+    // do=true makes DNSSEC-signed zones attach RRSIG (type 46) records to
+    // every answer; they are signature blobs with no report value.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          Status: 0,
+          AD: true,
+          Answer: [
+            { name: "example.com.", type: 1, TTL: 300, data: "93.184.216.34" },
+            { name: "example.com.", type: 46, TTL: 300, data: "A 13 2 300 1787569466 1787389466 34505 example.com. jRb+YDzsO6eEBuH5XEQ3dFxRV9Ko7jE5==" },
+          ],
+        }),
+      ),
+    );
+
+    const result = await queryDnsWithFallback("example.com", "A");
+
+    expect(result.authenticatedData).toBe(true);
+    expect(result.answers).toEqual([{ name: "example.com", type: "A", ttl: 300, data: "93.184.216.34" }]);
+  });
+
   it("returns fallback failure evidence when both resolvers fail", async () => {
     vi.stubGlobal(
       "fetch",
