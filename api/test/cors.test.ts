@@ -65,4 +65,36 @@ describe("testCors", () => {
     });
     expect(findings[0].detail).toContain("not exploitable as-is");
   });
+
+  it("does not combine reflected origin and credentials from different responses", async () => {
+    globalThis.fetch = vi.fn((_input, init) => Promise.resolve(new Response(null, {
+      status: 200,
+      headers: init?.method === "GET"
+        ? { "access-control-allow-origin": "https://evil.example" }
+        : { "access-control-allow-credentials": "true" },
+    })));
+
+    const { result, findings } = await testCors("https://example.com");
+    expect(result.reflectsOrigin).toBe(true);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toMatchObject({
+      id: "cors-origin-reflection",
+      severity: "medium",
+    });
+    expect(findings[0].detail).toContain("credentials are not allowed");
+  });
+
+  it("does not combine wildcard origin and credentials from different responses", async () => {
+    globalThis.fetch = vi.fn((_input, init) => Promise.resolve(new Response(null, {
+      status: 200,
+      headers: init?.method === "GET"
+        ? { "access-control-allow-origin": "*" }
+        : { "access-control-allow-credentials": "true" },
+    })));
+
+    const { result, findings } = await testCors("https://example.com");
+    expect(result.wildcardWithCredentials).toBe(false);
+    expect(result.vulnerable).toBe(false);
+    expect(findings).toEqual([]);
+  });
 });
