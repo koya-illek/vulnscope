@@ -12,6 +12,7 @@ import {
 import type { Env, OutboundRequestSummary, ScanCoverage, ScanReport } from "./types";
 import { handleMcp } from "./mcp";
 import { deriveDailyQuotaKey } from "./quota";
+import { decodeUtf8, readBoundedRequestBody, RequestBodyError } from "./http-body";
 
 const API_VERSION = "2.0.0";
 const REPORT_SCHEMA_VERSION = 2;
@@ -179,40 +180,13 @@ async function readScanInput(request: Request): Promise<ScanInput> {
   if (!contentType.toLowerCase().includes("application/json")) {
     throw new InputError("Content-Type must be application/json.");
   }
-  if (!request.body) throw new InputError("Request body is required.");
-  const declaredLength = Number.parseInt(request.headers.get("content-length") || "", 10);
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
-    throw new InputError("Request body is too large.");
-  }
-
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > MAX_REQUEST_BYTES) {
-        await reader.cancel();
-        throw new InputError("Request body is too large.");
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(new TextDecoder().decode(bytes));
-  } catch {
+    parsed = JSON.parse(decodeUtf8(await readBoundedRequestBody(request, MAX_REQUEST_BYTES)));
+  } catch (error) {
+    if (error instanceof RequestBodyError) {
+      throw new InputError(error.code === "missing" ? "Request body is required." : "Request body is too large.");
+    }
     throw new InputError("Invalid JSON request body.");
   }
   if (!parsed || typeof parsed !== "object") throw new InputError("JSON request body must be an object.");

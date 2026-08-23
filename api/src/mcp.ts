@@ -1,6 +1,7 @@
 import type { ScanReport } from "./types";
 import { BlockedTargetError, InputError, RateLimitError, ResolverUnavailableError } from "./security";
 import { OutboundPolicyError } from "./outbound";
+import { decodeUtf8, readBoundedRequestBody, RequestBodyError } from "./http-body";
 
 const MCP_PROTOCOL_VERSION = "2025-11-25";
 const MAX_MCP_REQUEST_BYTES = 16 * 1024;
@@ -167,33 +168,15 @@ function scanOutputSchema() {
 }
 
 async function readMessage(request: Request): Promise<Record<string, unknown>> {
-  const declaredLength = Number.parseInt(request.headers.get("content-length") || "", 10);
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_MCP_REQUEST_BYTES) throw new Error("MCP request is too large");
-  if (!request.body) throw new Error("MCP request body is required");
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
+  let parsed: unknown;
   try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > MAX_MCP_REQUEST_BYTES) {
-        await reader.cancel();
-        throw new Error("MCP request is too large");
-      }
-      chunks.push(value);
+    parsed = JSON.parse(decodeUtf8(await readBoundedRequestBody(request, MAX_MCP_REQUEST_BYTES)));
+  } catch (error) {
+    if (error instanceof RequestBodyError) {
+      throw new Error(error.code === "missing" ? "MCP request body is required" : "MCP request is too large");
     }
-  } finally {
-    reader.releaseLock();
+    throw new Error("Invalid JSON");
   }
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  const parsed = JSON.parse(new TextDecoder().decode(bytes));
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Invalid JSON-RPC request");
   return parsed as Record<string, unknown>;
 }
