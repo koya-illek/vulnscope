@@ -630,7 +630,7 @@ input:focus-visible,
 .developer-access p { margin: 0; color: var(--muted); line-height: 1.7; }
 .developer-access .developer-note { margin-top: 18px; font: 500 11px/1.6 var(--mono); color: var(--accent); }
 .developer-links { display: grid; gap: 10px; }
-.developer-links > a, .developer-endpoint { display: grid; gap: 7px; padding: 18px 20px; border: 1px solid var(--line); background: var(--panel); color: var(--text); text-decoration: none; }
+.developer-links > a, .developer-endpoint { display: grid; gap: 7px; padding: 18px 20px; border: 1px solid var(--line); background: var(--surface); color: var(--text); text-decoration: none; }
 .developer-links > a { transition: border-color .2s, transform .2s; }
 .developer-links > a:hover { border-color: var(--accent); transform: translateX(3px); }
 .developer-links span, .developer-endpoint code { color: var(--muted); font: 500 11px/1.5 var(--mono); overflow-wrap: anywhere; }
