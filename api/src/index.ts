@@ -390,7 +390,14 @@ async function loadReport(db: D1Database, id: string): Promise<ScanReport | null
     SELECT report_json FROM scans WHERE id = ? AND expires_at > ?
   `).bind(id, new Date().toISOString()).first<{ report_json: string }>();
   if (!row) return null;
-  return upgradeStoredReport(JSON.parse(row.report_json));
+  // Shape-invalid rows already read as not-found via upgradeStoredReport;
+  // keep syntax-corrupt rows on the same honest path instead of surfacing
+  // scan-failure language from a read endpoint.
+  try {
+    return upgradeStoredReport(JSON.parse(row.report_json));
+  } catch {
+    return null;
+  }
 }
 
 function upgradeStoredReport(raw: unknown): ScanReport | null {
