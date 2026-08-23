@@ -15,6 +15,27 @@ describe("fingerprint CMS detection", () => {
     expect(result.cms).toBeNull();
   });
 
+  it("does not detect Joomla or Ghost from prose that merely mentions them", () => {
+    const html = `
+      <article><h1>Ghost stories and our Joomla migration</h1>
+      <p>We compared Ghost against Joomla before settling on a static site.
+      The word ghost alone must not fingerprint a CMS.</p></article>`;
+    const { result } = fingerprint(htmlHeaders(), html);
+    expect(result.cms).toBeNull();
+  });
+
+  it("detects Joomla from its generator meta tag", () => {
+    const html = `<meta name="generator" content="Joomla! - Open Source Content Management">`;
+    const { result } = fingerprint(htmlHeaders(), html);
+    expect(result.cms?.name).toBe("Joomla");
+  });
+
+  it("detects Ghost from its generator meta tag", () => {
+    const html = `<meta name="generator" content="Ghost 5.87">`;
+    const { result } = fingerprint(htmlHeaders(), html);
+    expect(result.cms?.name).toBe("Ghost");
+  });
+
   it("detects WordPress from wp-content asset markers", () => {
     const html = `<link rel="stylesheet" href="/wp-content/themes/a/style.css">`;
     const { result } = fingerprint(htmlHeaders(), html);

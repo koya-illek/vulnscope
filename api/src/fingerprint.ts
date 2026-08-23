@@ -8,9 +8,6 @@ export function fingerprint(
   html: string,
 ): { result: FingerprintResult; findings: Finding[] } {
   const findings: Finding[] = [];
-  // One full-body slice for every CMS/framework check so marker position in
-  // large pages cannot decide whether a technology is detected.
-  const htmlLower = html.toLowerCase();
 
   // --- Server ---
   const server = headers.get("server") || null;
@@ -29,9 +26,15 @@ export function fingerprint(
   } else if (/drupal\.settings|drupal\.js|class=["'][^"']*drupal/i.test(html)) {
     const versionMatch = html.match(/name=["']generator["']\s+content=["']Drupal\s+([\d.]+)/i);
     cms = { name: "Drupal", version: versionMatch ? versionMatch[1] : null };
-  } else if (/joomla|<meta\s+name=["']generator["']\s+content=["']joomla/i.test(htmlLower)) {
+  } else if (
+    // Structural markers only: bare "joomla" appears in ordinary tech prose.
+    /name=["']generator["']\s+content=["']Joomla|\/media\/(?:jui|system)\/js\/|\/components\/com_[a-z]+\/|\/modules\/mod_[a-z]+\//i.test(html)
+  ) {
     cms = { name: "Joomla", version: null };
-  } else if (/ghost|<meta\s+name=["']generator["']\s+content=["']Ghost/i.test(htmlLower)) {
+  } else if (
+    // Same rule as Joomla: "ghost" is a common word and proves nothing.
+    /name=["']generator["']\s+content=["']Ghost|\/ghost(?:-sdk)?(?:\.min)?\.js|ghost-api=/i.test(html)
+  ) {
     cms = { name: "Ghost", version: null };
   } else if (/cdn\.shopify\.com|shopify\.theme/i.test(html)) {
     cms = { name: "Shopify", version: null };
