@@ -47,10 +47,16 @@
 
   function updateScanAvailability() {
     const authorised = Boolean(authConfirm?.checked);
-    scanButton.disabled = !authorised;
-    $("#scan-state").textContent = authorised
-      ? "Permission confirmed. Ready to scan."
-      : "Confirm permission to enable the scan.";
+    // A running scan owns the form: checkbox flips mid-run must not
+    // re-enable the submit button or imply late option changes applied.
+    scanButton.disabled = busy || !authorised;
+    probePathsCheckbox.disabled = busy;
+    checkTakeoverCheckbox.disabled = busy;
+    $("#scan-state").textContent = busy
+      ? "Scan in progress."
+      : authorised
+        ? "Permission confirmed. Ready to scan."
+        : "Confirm permission to enable the scan.";
   }
 
   authConfirm?.addEventListener("change", updateScanAvailability);
@@ -111,6 +117,21 @@
     return "Network request failed. Check your connection and try again.";
   }
 
+  // Pre-stream failures (bad content type, oversized body, invalid JSON,
+  // disallowed origin) answer with a JSON {error} body instead of an NDJSON
+  // stream; prefer that actionable message over a bare HTTP status.
+  async function responseError(response) {
+    try {
+      const payload = await response.json();
+      if (payload && typeof payload.error === "string" && payload.error) {
+        return new Error(payload.error);
+      }
+    } catch {
+      // Fall through to the generic status message.
+    }
+    return new Error(`Scan failed with HTTP ${response.status}`);
+  }
+
   async function runScan(url) {
     if (!url.trim() || busy) return;
     busy = true;
@@ -118,7 +139,7 @@
     beginProgress();
     errorPanel.classList.add("hidden");
     reportPanel.classList.add("hidden");
-    scanButton.disabled = true;
+    updateScanAvailability();
     try {
       const response = await fetch(`${API_BASE}/api/scans/stream`, {
         method: "POST",
@@ -134,7 +155,7 @@
         await response.body?.cancel().catch(() => {});
         return;
       }
-      if (!response.ok || !response.body) throw new Error(`Scan failed with HTTP ${response.status}`);
+      if (!response.ok || !response.body) throw await responseError(response);
       const payload = await readScanStream(response);
       if (token !== runToken) return;
       finishProgress();
@@ -156,6 +177,7 @@
     busy = true;
     const token = ++runToken;
     beginProgress("Loading saved report");
+    updateScanAvailability();
     try {
       const response = await fetch(`${API_BASE}/api/scans/${encodeURIComponent(id)}`);
       let payload;
@@ -610,8 +632,10 @@
     reportPanel.classList.add("hidden");
     errorPanel.classList.add("hidden");
     stopProgress();
-    if (replaceHistory) history.replaceState(null, "", location.pathname);
-    else history.pushState({}, "", location.pathname);
+    // Preserve the query string: only the report hash is view state.
+    const basePath = `${location.pathname}${location.search}`;
+    if (replaceHistory) history.replaceState(null, "", basePath);
+    else history.pushState({}, "", basePath);
     document.title = "VulnScope: Find what's exposed";
     input.value = "";
     if (authConfirm) authConfirm.checked = false;
