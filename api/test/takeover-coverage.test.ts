@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { analyzeUrl } from "../src/analyzer";
 import { auditCookies } from "../src/cookies";
 import { testCors } from "../src/cors";
-import { inspectDns } from "../src/dns";
+import { inspectDns, queryDnsWithFallback } from "../src/dns";
+import type { DnsQueryResult } from "../src/types";
 import { fingerprint } from "../src/fingerprint";
 import { auditHeaders } from "../src/headers-audit";
 import { probeMethods } from "../src/methods";
@@ -14,6 +15,7 @@ import { scanWordPress } from "../src/wordpress";
 vi.mock("../src/dns", () => ({
   inspectDns: vi.fn(),
   queryDns: vi.fn(),
+  queryDnsWithFallback: vi.fn(),
 }));
 
 vi.mock("../src/ssl", () => ({ inspectSsl: vi.fn() }));
@@ -180,5 +182,98 @@ describe("takeover coverage honesty", () => {
     );
 
     expect(report.coverage.takeover.status).toBe("failed");
+  });
+
+  it("marks subdomain rows as unverified when DNS queries fail instead of implying a clean result", async () => {
+    const failedQuery = (name: string, type: string): DnsQueryResult => ({
+      resolver: "mock-resolver",
+      name,
+      type,
+      status: -1,
+      authenticatedData: false,
+      answers: [],
+      elapsedMs: 1,
+      error: "The scan request budget was exhausted.",
+      evidenceKind: "dns_observation",
+    });
+    vi.mocked(queryDnsWithFallback).mockImplementation(async (name: string, type: string) =>
+      failedQuery(name, type),
+    );
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("crt.sh")) {
+        return Response.json(
+          [{ name_value: "stale.example.com" }],
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      return htmlResponse();
+    });
+
+    const report = await analyzeUrl(
+      "https://example.com",
+      7,
+      {},
+      () => {},
+      { probePaths: false, checkTakeover: true },
+    );
+
+    expect(report.takeover).toHaveLength(1);
+    const row = report.takeover![0];
+    expect(row.subdomain).toBe("stale.example.com");
+    expect(row.resolverState).toBe("incomplete");
+    expect(row.vulnerable).toBe(false);
+    expect(row.evidence).toContain("DNS verification was incomplete");
+    expect(row.evidence).not.toContain("No takeover indicators found");
+  });
+
+  it("keeps the dangling-record hint for a confirmed NXDOMAIN with a CNAME", async () => {
+    vi.mocked(queryDnsWithFallback).mockImplementation(async (name: string, type: string) => {
+      if (type === "CNAME") {
+        return {
+          resolver: "mock-resolver",
+          name,
+          type,
+          status: 0,
+          authenticatedData: false,
+          answers: [{ name, type: "CNAME", ttl: 300, data: "example.github.io" }],
+          elapsedMs: 1,
+          evidenceKind: "dns_observation",
+        };
+      }
+      // A and AAAA answer NXDOMAIN (status 3) with no records.
+      return {
+        resolver: "mock-resolver",
+        name,
+        type,
+        status: 3,
+        authenticatedData: false,
+        answers: [],
+        elapsedMs: 1,
+        evidenceKind: "dns_observation",
+      };
+    });
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("crt.sh")) {
+        return Response.json(
+          [{ name_value: "dangling.example.com" }],
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      return htmlResponse();
+    });
+
+    const report = await analyzeUrl(
+      "https://example.com",
+      7,
+      {},
+      () => {},
+      { probePaths: false, checkTakeover: true },
+    );
+
+    expect(report.takeover).toHaveLength(1);
+    const row = report.takeover![0];
+    expect(row.cname).toBe("example.github.io");
+    expect(row.resolverState).toBe("nxdomain");
+    expect(row.evidence).toContain("no confirmed A or AAAA address");
   });
 });

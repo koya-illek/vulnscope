@@ -507,6 +507,18 @@ async function checkSubdomainTakeover(hostname: string, context?: OutboundContex
           }
         }
 
+        if (!vulnerable && resolverState === "incomplete") {
+          // Budget exhaustion and provider faults surface as failed DNS
+          // queries here. Those subdomains were not actually verified, so
+          // the stored row must say so instead of implying a clean result.
+          const problems = [...new Set(
+            [cnameResult, aResult, aaaaResult]
+              .filter((result) => result.status < 0 || result.status === 2)
+              .map((result) => result.error || `${result.resolver} returned status ${result.status}`),
+          )];
+          evidence = `DNS verification was incomplete${problems.length ? `: ${problems.join("; ")}` : ""}${httpStatus !== null ? `; HTTP probe observed status ${httpStatus}` : ""}`;
+        }
+
         results.push({
           subdomain,
           cname,
