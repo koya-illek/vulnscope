@@ -23,16 +23,12 @@ const RECENT_SCAN_TTL = 300;
 /**
  * Set-equality assertions between the stored-report validation lists and the
  * types they mirror. These lists decide which stored fields are trusted on
- * read, so a phase, status, or severity added to one side without the other
- * must fail compilation rather than silently skip validation.
+ * read, so adding a coverage phase, status, or severity to one side without
+ * the other must fail compilation rather than silently skip validation.
  */
 type SetsEqual<A, B> = ((<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : never);
 type AssertExact<Actual, Expected> = SetsEqual<Actual, Expected>;
 
-// These lists decide which stored fields are trusted on read, so they must
-// enumerate their types exactly: adding a coverage phase, status, or severity
-// without updating the list is a compile error, not a silently unvalidated
-// field.
 const COVERAGE_PHASES = [
   "mainFetch",
   "headers",
@@ -200,13 +196,19 @@ async function readScanInput(request: Request): Promise<ScanInput> {
   if (!contentType.toLowerCase().includes("application/json")) {
     throw new InputError("Content-Type must be application/json.");
   }
-  let parsed: unknown;
+  let bytes: Uint8Array;
   try {
-    parsed = JSON.parse(decodeUtf8(await readBoundedRequestBody(request, MAX_REQUEST_BYTES)));
+    bytes = await readBoundedRequestBody(request, MAX_REQUEST_BYTES);
   } catch (error) {
     if (error instanceof RequestBodyError) {
       throw new InputError(error.code === "missing" ? "Request body is required." : "Request body is too large.");
     }
+    throw error;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(decodeUtf8(bytes));
+  } catch {
     throw new InputError("Invalid JSON request body.");
   }
   if (!parsed || typeof parsed !== "object") throw new InputError("JSON request body must be an object.");

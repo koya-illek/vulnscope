@@ -168,13 +168,19 @@ function scanOutputSchema() {
 }
 
 async function readMessage(request: Request): Promise<Record<string, unknown>> {
-  let parsed: unknown;
+  let bytes: Uint8Array;
   try {
-    parsed = JSON.parse(decodeUtf8(await readBoundedRequestBody(request, MAX_MCP_REQUEST_BYTES)));
+    bytes = await readBoundedRequestBody(request, MAX_MCP_REQUEST_BYTES);
   } catch (error) {
     if (error instanceof RequestBodyError) {
       throw new Error(error.code === "missing" ? "MCP request body is required" : "MCP request is too large");
     }
+    throw error;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(decodeUtf8(bytes));
+  } catch {
     throw new Error("Invalid JSON");
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Invalid JSON-RPC request");
