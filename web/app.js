@@ -23,12 +23,23 @@
   const reportPanel = $("#report");
   const methodDialog = $("#method-dialog");
 
+  // Stage order mirrors the backend pipeline: recon/dns/fetch/ssl, then
+  // headers/cookies, fingerprint, paths, then cors/secrets/wordpress/methods/
+  // takeover together on the CORS node. Keeping the map monotonic with the
+  // emitted stages stops the route nodes from jumping backwards.
   const STAGE_MAP = {
-    recon: 0,
+    validated: 0,
+    dns: 0,
+    fetch: 0,
+    ssl: 0,
     headers: 1,
-    paths: 2,
-    fingerprint: 3,
+    cookies: 1,
+    fingerprint: 2,
+    paths: 3,
     cors: 4,
+    secrets: 4,
+    wordpress: 4,
+    methods: 4,
     takeover: 4,
     complete: 5
   };
