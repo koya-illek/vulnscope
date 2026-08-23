@@ -203,13 +203,9 @@ export async function analyzeUrl(
     : { status: "unavailable", detail: `Certificate-transparency evidence was unavailable. ${ssl.certificateEvidence.limitation}` };
   emit({ stage: "ssl", message: ssl.protocol ? `TLS: ${ssl.protocol}` : "TLS data unavailable" });
 
-  // --- Fingerprint ---
-  const { result: fingerprintResult, findings: fingerprintFindings } = response
-    ? fingerprint(response.headers, bodyText)
-    : { result: emptyFingerprint(), findings: [] as Finding[] };
-  emit({ stage: "fingerprint", message: fingerprintResult.cms ? `CMS: ${fingerprintResult.cms.name}` : "Fingerprint complete" });
-
   // --- Header audit ---
+  // Header/cookie auditing runs before fingerprinting so emitted progress
+  // stages stay in the advertised order (headers, fingerprint, paths).
   const { result: headerResult, findings: headerFindings } = response
     ? auditHeaders(response.headers)
     : { result: emptyHeaderResult(), findings: [] as Finding[] };
@@ -226,6 +222,12 @@ export async function analyzeUrl(
     ? { status: "measured", detail: `Audited ${cookies.length} cookie(s) from the main GET response.`, requested: true }
     : { status: "skipped", detail: "Cookie audit skipped because the main fetch failed.", requested: true };
   emit({ stage: "cookies", message: `Cookies: ${cookies.length} audited` });
+
+  // --- Fingerprint ---
+  const { result: fingerprintResult, findings: fingerprintFindings } = response
+    ? fingerprint(response.headers, bodyText)
+    : { result: emptyFingerprint(), findings: [] as Finding[] };
+  emit({ stage: "fingerprint", message: fingerprintResult.cms ? `CMS: ${fingerprintResult.cms.name}` : "Fingerprint complete" });
 
   // --- Exposed paths ---
   let exposedPaths: ExposedPath[] = [];
