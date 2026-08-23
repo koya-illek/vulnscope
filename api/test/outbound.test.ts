@@ -99,6 +99,64 @@ describe("bounded public outbound policy", () => {
   });
 });
 
+describe("public host resolution through CNAME answers", () => {
+  function cnameDohResponse() {
+    // Production DoH resolvers return the alias chain inside the same Answer
+    // array as the address records (verified against cloudflare-dns.com and
+    // dns.google). The alias hostname must not enter the IP candidate list.
+    return Response.json({
+      Status: 0,
+      AD: false,
+      Answer: [
+        { name: "www.example.com.", type: 5, TTL: 300, data: "cdn.example.net." },
+        { name: "cdn.example.net", type: 1, TTL: 60, data: "93.184.216.34" },
+      ],
+    });
+  }
+
+  it("resolves a host whose DNS answer contains a CNAME record", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => cnameDohResponse()));
+    const context = createOutboundContext();
+
+    await expect(context.resolveHost!("www.example.com")).resolves.toEqual(["93.184.216.34"]);
+  });
+
+  it("completes a redirect hop that requires fresh resolution of a CNAME-bearing host", async () => {
+    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(input instanceof Request ? input.url : input.toString());
+      if (url.hostname === "cloudflare-dns.com" || url.hostname === "dns.google") {
+        return cnameDohResponse();
+      }
+      if (url.protocol === "http:") {
+        return new Response(null, { status: 301, headers: { location: "https://www.example.com/home" } });
+      }
+      return new Response("target page", { status: 200 });
+    });
+    // No seeded addresses: every hop resolves fresh, like a redirect chain.
+    const context = createOutboundContext();
+
+    const response = await safeFetch("http://www.example.com/", {
+      baseUrl: new URL("http://www.example.com"),
+      context,
+    });
+    expect(response.status).toBe(200);
+    expect(context.budget.redirects).toEqual([
+      { from: "http://www.example.com/", to: "https://www.example.com/home", status: 301 },
+    ]);
+  });
+
+  it("still fails closed when a CNAME chain yields no address records", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
+      Status: 0,
+      AD: false,
+      Answer: [{ name: "broken.example.com.", type: 5, TTL: 300, data: "missing.example.net." }],
+    })));
+    const context = createOutboundContext();
+
+    await expect(context.resolveHost!("broken.example.com")).rejects.toThrow(/no confirmed public address/i);
+  });
+});
+
 describe("public report cookie evidence", () => {
   it("keeps cookie policy metadata without storing the cookie value", () => {
     const headers = new Headers();

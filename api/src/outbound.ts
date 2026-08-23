@@ -442,9 +442,13 @@ async function resolvePublicHost(context: OutboundContext, hostname: string): Pr
   // the same request budget and are deliberately kept to A and AAAA.
   const a = await queryDnsWithFallback(hostname, "A", context);
   const aaaa = await queryDnsWithFallback(hostname, "AAAA", context);
+  // Resolvers return the CNAME chain inside the same Answer array, so only
+  // records of the queried address type are address candidates. A CNAME
+  // hostname string would fail isPublicIp and wrongly fail closed every
+  // host that resolves through an alias.
   const addresses = [...new Set([
-    ...a.answers.map((answer) => answer.data),
-    ...aaaa.answers.map((answer) => answer.data),
+    ...a.answers.filter((answer) => answer.type === "A").map((answer) => answer.data),
+    ...aaaa.answers.filter((answer) => answer.type === "AAAA").map((answer) => answer.data),
   ])];
   if (addresses.length === 0 || addresses.some((address) => !isPublicIp(address))) {
     throw new OutboundPolicyError("The outbound hostname resolved to no confirmed public address.");
