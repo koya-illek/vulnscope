@@ -28,6 +28,12 @@ production value in `wrangler.toml` or `.dev.vars`. Validation failures and
 recent-scan cache hits are uncharged, and a scan aborted by a VulnScope
 resolver outage is refunded so the invited retry is free.
 
+In the browser, VulnScope keeps a local-only list of the reports this browser
+has seen (ID, hostname, grade, timestamps) under the scan form, and a report
+can be diffed against an earlier same-host scan: grade transition, per-severity
+deltas, added and resolved findings. That list lives entirely in
+`localStorage` — the server stores no history relationship between reports.
+
 ## Agent integrations
 
 ```text

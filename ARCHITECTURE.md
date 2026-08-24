@@ -23,6 +23,7 @@ It provides:
 - optional subdomain-takeover evidence
 - certificate-transparency history
 - coverage-aware grading, NDJSON progress, shareable reports, REST, OpenAPI, and MCP
+- a browser-local record of this browser's scans with previous-scan comparison
 
 It does not provide exploitability, authenticated coverage, CVE proof, port coverage, or a guarantee that a site is secure.
 
@@ -66,6 +67,7 @@ flowchart LR
 | Scoring | Converts findings and phase coverage into a grade and severity summary | `api/src/scorer.ts` |
 | MCP adapter | Publishes two typed tools over stateless JSON-RPC HTTP | `api/src/mcp.ts` |
 | Report UI | Starts scans, renders progress, filters evidence, and renders retrieved reports | `web/app.js`, `web/report-view.js` |
+| Local scan history | Keeps a browser-local list of seen reports and diffs a report against an earlier same-host scan; nothing is stored server-side | `web/scan-history.js` |
 
 ## Scan flow
 
@@ -109,6 +111,8 @@ When a budget is exhausted, the remaining work is marked partial or skipped. The
 
 MCP publishes `scan_website` and `get_vulnscope_report`.
 
+Known resources answer unsupported methods with 405 and an `Allow` header naming the supported set, so a wrong method is distinguishable from a missing path.
+
 ## Third-party services and data disclosure
 
 | Service | Use | Data sent | Required |
@@ -134,6 +138,7 @@ Detected CMS versions remain fingerprint evidence. VulnScope does not grade a Wo
 - Web scans and MCP `scan_website` calls charge separate per-IP daily buckets (`DAILY_SCAN_LIMIT` scope `scan`, `MCP_DAILY_LIMIT` scope `mcp`) through the same atomic counter, so one caller class cannot exhaust the other's allowance.
 - D1 stores a versioned HMAC of the quota scope, UTC date, and source IP. `RATE_LIMIT_HMAC_KEY` is a managed Worker secret with at least 32 bytes and is not stored in repository configuration. Rotating it resets the current day's counters.
 - Anyone holding an unexpired report identifier can retrieve the report.
+- The browser keeps a local-only list of seen reports (ID, hostname, grade, counts, timestamps) in `localStorage`, capped at 24 entries and pruned on expiry; it never sends that list to the server and is cleared by the viewer at will.
 
 ## Security boundaries
 
