@@ -241,6 +241,7 @@ input:focus-visible,
 }
 .progress-head { display: flex; justify-content: space-between; align-items: center; }
 .progress-head h2 { margin: 0; font-size: 25px; }
+.progress-actions { display: flex; gap: 12px; align-items: center; }
 .spinner { width: 28px; height: 28px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .live-route { display: grid; grid-template-columns: auto 1fr auto 1fr auto 1fr auto 1fr auto 1fr auto; align-items: center; margin: 32px 0 26px; }

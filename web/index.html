@@ -20,6 +20,7 @@
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
   <script src="./config.js" defer></script>
+  <script src="./stream-reader.js" defer></script>
   <script src="./report-view.js" defer></script>
   <script src="./app.js" defer></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"VulnScope","url":"https://scan.illek.ie/","description":"Run bounded unauthenticated public-site security checks with evidence-backed reports.","applicationCategory":"SecurityApplication","operatingSystem":"Any","browserRequirements":"Requires a modern web browser"}</script>
@@ -97,7 +98,10 @@
         <div>
           <h2 id="progress-title" aria-live="polite">Scanning target</h2>
         </div>
-        <span class="spinner" aria-hidden="true"></span>
+        <div class="progress-actions">
+          <button class="secondary-button" id="cancel-scan" type="button">Cancel</button>
+          <span class="spinner" aria-hidden="true"></span>
+        </div>
       </div>
       <div class="live-route" id="live-route" aria-hidden="true">
         <div class="route-node active" data-stage="0"><span>01</span><strong>RECON</strong></div>
@@ -124,7 +128,7 @@
     </section>
 
     <section class="error-panel hidden" id="error-panel" role="alert" tabindex="-1">
-      <span class="error-code">SCAN_FAILED</span>
+      <span class="error-code" id="error-code">SCAN_FAILED</span>
       <div>
         <h2>The scan could not be completed</h2>
         <p id="error-message"></p>

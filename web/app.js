@@ -3,13 +3,16 @@
 
   const API_BASE = (window.VULN_SCANNER_CONFIG?.API_BASE || "").replace(/\/$/, "");
   const reportView = window.VulnScopeReport;
+  const streamReader = window.VulnScopeStream;
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   const state = { report: null, progressStep: 0, activeFilter: "all" };
   // One scan or report load owns the UI at a time; runToken invalidates
-  // completions of runs abandoned via "New scan" or Back navigation.
+  // completions of runs abandoned via "New scan", Cancel, or Back navigation,
+  // and activeAbort tears down their in-flight requests.
   let busy = false;
   let runToken = 0;
+  let activeAbort = null;
   const OBSERVATION_NOTE_SUFFIX = "VulnScope performs unauthenticated checks only. It does not attempt exploitation, submit forms, or bypass authentication. Findings reflect what an external observer can discover without credentials.";
 
   const form = $("#scan-form");
@@ -72,6 +75,7 @@
     runScan(input.value);
   });
   $("#new-scan").addEventListener("click", () => reset());
+  $("#cancel-scan").addEventListener("click", () => reset());
   $("#error-close").addEventListener("click", () => {
     errorPanel.classList.add("hidden");
     input.focus();
@@ -113,6 +117,7 @@
   // app or the API). Anything else — typically an offline fetch rejecting
   // with TypeError — gets one friendly line instead of browser internals.
   function friendlyError(error) {
+    if (error?.name === "AbortError") return "The scan was cancelled.";
     if (error instanceof Error) return error.message;
     return "Network request failed. Check your connection and try again.";
   }
@@ -136,6 +141,11 @@
     if (!url.trim() || busy) return;
     busy = true;
     const token = ++runToken;
+    // Cancelling the controller (Cancel button, "New scan", Back) aborts the
+    // fetch and its stream so an abandoned run stops downloading instead of
+    // silently driving the progress UI from the background.
+    const abort = new AbortController();
+    activeAbort = abort;
     beginProgress();
     errorPanel.classList.add("hidden");
     reportPanel.classList.add("hidden");
@@ -144,6 +154,7 @@
       const response = await fetch(`${API_BASE}/api/scans/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: abort.signal,
         body: JSON.stringify({
           url: url.trim(),
           probePaths: probePathsCheckbox.checked,
@@ -151,13 +162,13 @@
         })
       });
       if (token !== runToken) {
-        // Superseded by "New scan" or history navigation; stop downloading.
+        // Superseded before the stream started; stop downloading.
         await response.body?.cancel().catch(() => {});
         return;
       }
       if (!response.ok || !response.body) throw await responseError(response);
-      const payload = await readScanStream(response);
-      if (token !== runToken) return;
+      const payload = await readScanStream(response, () => token === runToken);
+      if (token !== runToken || payload === null) return;
       finishProgress();
       displayReport(payload, true);
     } catch (error) {
@@ -165,6 +176,7 @@
       stopProgress();
       showError(friendlyError(error));
     } finally {
+      if (activeAbort === abort) activeAbort = null;
       if (token === runToken) {
         busy = false;
         updateScanAvailability();
@@ -176,10 +188,12 @@
     if (busy) return;
     busy = true;
     const token = ++runToken;
+    const abort = new AbortController();
+    activeAbort = abort;
     beginProgress("Loading saved report");
     updateScanAvailability();
     try {
-      const response = await fetch(`${API_BASE}/api/scans/${encodeURIComponent(id)}`);
+      const response = await fetch(`${API_BASE}/api/scans/${encodeURIComponent(id)}`, { signal: abort.signal });
       let payload;
       try {
         payload = await response.json();
@@ -193,8 +207,9 @@
     } catch (error) {
       if (token !== runToken) return;
       stopProgress();
-      showError(friendlyError(error));
+      showError(friendlyError(error), { badge: "LOAD_FAILED" });
     } finally {
+      if (activeAbort === abort) activeAbort = null;
       if (token === runToken) {
         busy = false;
         updateScanAvailability();
@@ -204,35 +219,14 @@
 
   // ─── NDJSON stream reading ────────────────────────────────────────
 
-  async function readScanStream(response) {
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
+  async function readScanStream(response, isLive) {
     let report = null;
-    const handleLine = (line) => {
-      if (!line.trim()) return;
-      let event;
-      try {
-        event = JSON.parse(line);
-      } catch {
-        throw new Error("The scan stream returned malformed data.");
-      }
+    const alive = await streamReader.consumeNdjson(response.body, (event) => {
       if (event.type === "progress") applyProgress(event);
-      if (event.type === "result") report = event.report;
-      if (event.type === "error") throw new Error(event.error || "Scan failed.");
-    };
-    while (true) {
-      const { done, value } = await reader.read();
-      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-      for (const line of lines) handleLine(line);
-      if (done) break;
-    }
-    // Flush the decoder and keep a final event that lacks its trailing
-    // newline (a truncated stream must not silently drop the result).
-    decoder.decode();
-    if (buffer.trim()) handleLine(buffer);
+      else if (event.type === "result") report = event.report;
+      else if (event.type === "error") throw new Error(event.error || "Scan failed.");
+    }, { isLive });
+    if (!alive) return null;
     if (!report) throw new Error("The scan ended without a report.");
     return report;
   }
@@ -292,7 +286,10 @@
     progressPanel.classList.add("hidden");
   }
 
-  function showError(message) {
+  function showError(message, { badge = "SCAN_FAILED" } = {}) {
+    // The badge names the failure class: a scan that ran versus a saved
+    // report that could not be loaded are different user situations.
+    $("#error-code").textContent = badge;
     $("#error-message").textContent = message;
     errorPanel.classList.remove("hidden");
     scrollToElement(errorPanel, "center");
@@ -440,17 +437,21 @@
     if (tlsMeasured && ssl.cipher) rows.push(["Cipher suite", ssl.cipher, ""]);
     if (ssl.issuer) rows.push(["Certificate issuer", ssl.issuer, ""]);
     if (ssl.subject) rows.push(["Certificate subject", ssl.subject, ""]);
-    if (ssl.validFrom) rows.push(["CT entry valid from", ssl.validFrom.slice(0, 10), ""]);
-    if (ssl.validTo) rows.push(["CT entry valid to", ssl.validTo.slice(0, 10), ""]);
+    // Migrated rows are not per-field validated on read, so stored SSL
+    // fields must prove their type before string operations.
+    if (typeof ssl.validFrom === "string" && ssl.validFrom) rows.push(["CT entry valid from", ssl.validFrom.slice(0, 10), ""]);
+    if (typeof ssl.validTo === "string" && ssl.validTo) rows.push(["CT entry valid to", ssl.validTo.slice(0, 10), ""]);
 
     if (ssl.daysUntilExpiry !== undefined && ssl.daysUntilExpiry !== null) {
-      const days = ssl.daysUntilExpiry;
-      let text = `${days} days`;
-      if (days < 0) text = `reported expired ${Math.abs(days)}d ago`;
-      rows.push(["CT entry expiry (not active certificate)", text, ""]);
+      const days = Number(ssl.daysUntilExpiry);
+      if (Number.isFinite(days)) {
+        let text = `${days} days`;
+        if (days < 0) text = `reported expired ${Math.abs(days)}d ago`;
+        rows.push(["CT entry expiry (not active certificate)", text, ""]);
+      }
     }
 
-    if (ssl.certificateEvidence) {
+    if (ssl.certificateEvidence && typeof ssl.certificateEvidence === "object") {
       const evidence = ssl.certificateEvidence;
       rows.push(["Certificate transparency evidence", `${evidence.source}: ${evidence.status}`, ""]);
       rows.push(["Certificate transparency limitation", evidence.limitation, ""]);
@@ -621,6 +622,10 @@
 
   function reset({ replaceHistory = false } = {}) {
     runToken++;
+    // Tear down any in-flight scan or report fetch owned by the abandoned
+    // run; its completions are already invalidated by the token bump.
+    activeAbort?.abort();
+    activeAbort = null;
     busy = false;
     state.report = null;
     state.activeFilter = "all";
