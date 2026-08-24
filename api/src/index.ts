@@ -341,6 +341,17 @@ async function createScan(
     headers: { "Content-Type": "application/json", "Cache-Control": `public, max-age=${RECENT_SCAN_TTL}` },
   });
   ctx.waitUntil(recentCache.put(cacheKey, cacheResponse));
+  // Workers observability ships these for free; one line per completed scan
+  // gives operations grade/status/duration/outbound correlation without a
+  // metrics pipeline. No target or caller identifiers beyond the stored ID.
+  console.info(JSON.stringify({
+    event: "scan_complete",
+    reportId: report.id,
+    status: report.status,
+    grade: report.summary.grade,
+    durationMs: report.totalDurationMs,
+    outboundRequests: report.outbound.requestsAttempted,
+  }));
   return report;
 }
 
@@ -435,6 +446,7 @@ async function refundRateLimit(request: Request, env: Env, quota: QuotaPolicy): 
     SET request_count = MAX(request_count - 1, 0), updated_at = ?
     WHERE client_key = ? AND window_date = ?
   `).bind(new Date().toISOString(), key, date).run();
+  console.warn(JSON.stringify({ event: "quota_refunded", reason: "resolver_outage", scope: quota.scope }));
 }
 
 async function enforceScopedDailyRateLimit(request: Request, env: Env, scope: string, limit: number, label: string): Promise<void> {
@@ -659,10 +671,15 @@ function legacyCoverage(): ScanCoverage {
 
 async function cleanExpired(db: D1Database): Promise<void> {
   const today = new Date().toISOString();
-  await db.batch([
+  const [scans, quotas] = await db.batch([
     db.prepare("DELETE FROM scans WHERE expires_at <= ?").bind(today),
     db.prepare("DELETE FROM rate_limits WHERE window_date < date('now', '-2 day')"),
   ]);
+  console.info(JSON.stringify({
+    event: "cleanup_expired",
+    scansDeleted: scans?.meta?.changes ?? 0,
+    quotaRowsPurged: quotas?.meta?.changes ?? 0,
+  }));
 }
 
 function clampInt(value: string | undefined, fallback: number, min: number, max: number): number {
