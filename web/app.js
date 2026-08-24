@@ -66,6 +66,14 @@
   authConfirm?.addEventListener("change", updateScanAvailability);
   updateScanAvailability();
 
+  // A running run costs daily quota and its bearer-link report is first seen
+  // here; closing or reloading mid-run would lose both silently.
+  window.addEventListener("beforeunload", (event) => {
+    if (!busy) return;
+    event.preventDefault();
+    event.returnValue = "";
+  });
+
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     if (busy) return;
@@ -196,7 +204,7 @@
     const token = ++runToken;
     const abort = new AbortController();
     activeAbort = abort;
-    beginProgress("Loading saved report");
+    beginProgress("Loading saved report", { showStages: false });
     updateScanAvailability();
     try {
       const response = await fetch(`${API_BASE}/api/scans/${encodeURIComponent(id)}`, { signal: abort.signal });
@@ -257,9 +265,13 @@
     element?.scrollIntoView({ behavior: scrollBehavior(), block });
   }
 
-  function beginProgress(title = "Scanning target") {
+  function beginProgress(title = "Scanning target", { showStages = true } = {}) {
     state.progressStep = 0;
     $("#progress-title").textContent = title;
+    // Saved-report loads have no scan stages to light up; showing them would
+    // imply remote work that is not happening.
+    $("#live-route").classList.toggle("hidden", !showStages);
+    $("#progress-steps").classList.toggle("hidden", !showStages);
     progressPanel.classList.remove("hidden");
     $("#progress-track").value = 8;
     updateProgressSteps();
@@ -294,8 +306,14 @@
 
   function showError(message, { badge = "SCAN_FAILED" } = {}) {
     // The badge names the failure class: a scan that ran versus a saved
-    // report that could not be loaded are different user situations.
+    // report that could not be loaded are different user situations, and the
+    // heading says the same thing in words.
+    const headings = {
+      SCAN_FAILED: "The scan could not be completed",
+      LOAD_FAILED: "That report could not be loaded",
+    };
     $("#error-code").textContent = badge;
+    $("#error-heading").textContent = headings[badge] || headings.SCAN_FAILED;
     $("#error-message").textContent = message;
     errorPanel.classList.remove("hidden");
     scrollToElement(errorPanel, "center");
