@@ -92,6 +92,7 @@
   });
   $("#copy-link").addEventListener("click", copyShareLink);
   $("#export-json").addEventListener("click", exportJson);
+  $("#export-markdown").addEventListener("click", exportMarkdown);
   $("#method-button").addEventListener("click", (event) => openMethodDialog(event.currentTarget));
   $("#footer-method-button").addEventListener("click", (event) => openMethodDialog(event.currentTarget));
   $("#dialog-close").addEventListener("click", () => methodDialog.close());
@@ -667,6 +668,20 @@
     anchor.download = `vulnscope-${slug(state.report.hostname)}-${slug(state.report.id)}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
+  }
+
+  function exportMarkdown() {
+    if (!state.report?.id) return;
+    // The server is the single rendering authority for Markdown (same rule
+    // that keeps a client copy of the builder out of this file); this only
+    // opens its attachment response. Scans are persisted before the report
+    // is displayed, so the endpoint can serve even a just-finished scan.
+    const anchor = document.createElement("a");
+    anchor.href = `${API_BASE}/api/scans/${encodeURIComponent(state.report.id)}/export?format=markdown`;
+    // Empty download hint keeps the browser on the attachment's own filename
+    // instead of navigating to it if Content-Disposition were ever dropped.
+    anchor.download = "";
+    anchor.click();
   }
 
   function reset({ replaceHistory = false } = {}) {
