@@ -378,6 +378,10 @@
       ? ` · ${outbound.requestsAttempted}/${outbound.maxSubrequests} outbound requests · ${outbound.bodyBytes || 0} bytes${outbound.truncatedBodies ? ` · ${outbound.truncatedBodies} body limit${outbound.truncatedBodies === 1 ? "" : "s"}` : ""}`
       : "";
     $("#report-meta").textContent = `${example ? "Sample data · " : ""}Report ${report.id || "unknown"} · ${report.status || "unknown"} · created ${created} · expires ${expires}${budget}`;
+    // A printed handoff leaves the browser chrome behind, so the artifact
+    // carries its own bearer link. Sample data has no real link and prints
+    // without one (:empty keeps the paragraph invisible).
+    $("#report-share-url").textContent = example ? "" : `${location.origin}${location.pathname}#${report.id}`;
 
     renderGrade(report.summary || {});
     renderMetrics(report.summary || {});

@@ -519,6 +519,10 @@ input:focus-visible,
 .detail-value.critical { color: var(--critical); }
 .detail-empty { color: var(--muted-2); font: 400 11px/1.4 var(--mono); }
 .report-meta { margin: 10px 0 0; color: var(--muted); font: 400 10px/1.5 var(--mono); }
+/* Screen readers and sighted users both get the link from the address bar
+   and the Copy share button; the plain-text copy exists for print only. */
+.report-share-url { display: none; }
+.report-share-url:empty { display: none !important; }
 .report-privacy-warning { margin: 8px 0 0; color: var(--warning); font-size: 12px; line-height: 1.45; }
 
 /* Header audit */
@@ -795,4 +799,12 @@ dialog h2 { margin: 0 0 30px; font-size: 32px; letter-spacing: -.04em; }
   .path-row, .cors-row, .takeover-row, .grade-section, .panel-header { break-inside: avoid; }
   .findings-list, .details-panel, .observation-note, .report-header { break-inside: auto; }
   .cs-body { overflow: visible; }
+  /* Paper and PDF cannot click the address bar: print the report's own link. */
+  .report-share-url {
+    display: block;
+    margin-top: 6pt;
+    color: var(--muted);
+    font: 400 9pt/1.4 var(--mono);
+    word-break: break-all;
+  }
 }
