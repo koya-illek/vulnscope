@@ -332,10 +332,12 @@
     // non-resolving host teaches nothing, so only real reports become live.
     if (example) {
       $("#example-badge").classList.remove("hidden");
-      ["#copy-link", "#export-json", "#new-scan"].forEach((selector) => $(selector).classList.add("hidden"));
+      // A sample has nothing to share or export, but "New scan" is the only
+      // labelled exit back to the form, so it stays available here too.
+      ["#copy-link", "#export-json", "#export-markdown"].forEach((selector) => $(selector).classList.add("hidden"));
     } else {
       $("#example-badge").classList.add("hidden");
-      ["#copy-link", "#export-json", "#new-scan"].forEach((selector) => $(selector).classList.remove("hidden"));
+      ["#copy-link", "#export-json", "#export-markdown", "#new-scan"].forEach((selector) => $(selector).classList.remove("hidden"));
     }
     const requestedUrl = report.requestedUrl || report.url || `https://${report.hostname}`;
     const targetLink = $("#report-url");
