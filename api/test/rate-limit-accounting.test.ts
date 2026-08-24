@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import worker, { scanQuotaPolicy } from "../src/index";
+import { ResolverUnavailableError } from "../src/security";
 import { deriveDailyQuotaKey } from "../src/quota";
 import type { Env } from "../src/types";
+
+vi.mock("../src/analyzer", () => ({
+  analyzeUrl: vi.fn(),
+}));
+
+import { analyzeUrl } from "../src/analyzer";
 
 const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
 
@@ -101,6 +108,48 @@ describe("quota accounting boundaries", () => {
       expect(reset).toBeGreaterThan(0);
     } finally {
       vi.unstubAllGlobals();
+    }
+  });
+
+  it("refunds the charged request when a scan dies to a resolver outage", async () => {
+    const executed: string[] = [];
+    const prepare = vi.fn((sql: string) => {
+      executed.push(sql);
+      if (sql.includes("INSERT INTO rate_limits")) {
+        return { bind: () => ({ first: async () => ({ request_count: 1 }) }) };
+      }
+      return {
+        bind: () => ({ first: async () => undefined, run: async () => undefined }),
+      };
+    });
+    vi.stubGlobal("caches", {
+      open: async () => ({
+        match: async () => undefined,
+        put: async () => {},
+      }),
+    });
+    vi.mocked(analyzeUrl).mockRejectedValue(
+      new ResolverUnavailableError("Public DNS resolvers were unavailable while checking example.com. Try the scan again."),
+    );
+    try {
+      const response = await worker.fetch(
+        new Request("https://scan.illek.ie/api/v2/scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "CF-Connecting-IP": "203.0.113.7" },
+          body: JSON.stringify({ url: "https://example.com" }),
+        }),
+        envWithDb(prepare),
+        ctx,
+      );
+
+      expect(response.status).toBe(503);
+      // The charge was written, then given back on the same scoped key.
+      const update = executed.find((sql) => sql.includes("UPDATE rate_limits"));
+      expect(update).toBeTruthy();
+      expect(update).toContain("MAX(request_count - 1, 0)");
+    } finally {
+      vi.unstubAllGlobals();
+      vi.mocked(analyzeUrl).mockReset();
     }
   });
 });

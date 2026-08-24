@@ -304,23 +304,35 @@ async function createScan(
 
   const retention = clampInt(env.REPORT_RETENTION_DAYS, 14, 1, 90);
   const incomingCf = request.cf as Record<string, unknown> | undefined;
-  const report = await analyzeUrl(
-    input.url,
-    retention,
-    {
-      colo: typeof incomingCf?.colo === "string" ? incomingCf.colo : undefined,
-      country: typeof incomingCf?.country === "string" ? incomingCf.country : undefined,
-    },
-    onProgress,
-    {
-      probePaths: input.probePaths,
-      checkTakeover: input.checkTakeover,
-      maxPaths: clampInt(env.MAX_PATH_PROBES, 18, 0, 18),
-      maxSubrequests: clampInt(env.MAX_SCAN_SUBREQUESTS, 46, 20, 46),
-      maxConcurrent: clampInt(env.MAX_SCAN_CONCURRENCY, 6, 1, 6),
-      maxDurationMs: clampInt(env.MAX_SCAN_DURATION_MS, 25_000, 5_000, 25_000),
-    },
-  );
+  let report: ScanReport;
+  try {
+    report = await analyzeUrl(
+      input.url,
+      retention,
+      {
+        colo: typeof incomingCf?.colo === "string" ? incomingCf.colo : undefined,
+        country: typeof incomingCf?.country === "string" ? incomingCf.country : undefined,
+      },
+      onProgress,
+      {
+        probePaths: input.probePaths,
+        checkTakeover: input.checkTakeover,
+        maxPaths: clampInt(env.MAX_PATH_PROBES, 18, 0, 18),
+        maxSubrequests: clampInt(env.MAX_SCAN_SUBREQUESTS, 46, 20, 46),
+        maxConcurrent: clampInt(env.MAX_SCAN_CONCURRENCY, 6, 1, 6),
+        maxDurationMs: clampInt(env.MAX_SCAN_DURATION_MS, 25_000, 5_000, 25_000),
+      },
+    );
+  } catch (error) {
+    // A resolver outage is VulnScope's own infrastructure failing before any
+    // analysis of the target happened; the retry its message invites must not
+    // cost a second charged request. Narrow to that error class so genuine
+    // failed scans stay charged, as their outbound work did run.
+    if (error instanceof ResolverUnavailableError) {
+      await refundRateLimit(request, env, quota);
+    }
+    throw error;
+  }
   await saveReport(env.DB, report);
   const cacheResponse = new Response(JSON.stringify(report), {
     headers: { "Content-Type": "application/json", "Cache-Control": `public, max-age=${RECENT_SCAN_TTL}` },
@@ -397,15 +409,34 @@ function enforceRateLimit(request: Request, env: Env, quota: QuotaPolicy): Promi
   return enforceScopedDailyRateLimit(request, env, quota.scope, quota.limit, quota.label);
 }
 
-async function enforceScopedDailyRateLimit(request: Request, env: Env, scope: string, limit: number, label: string): Promise<void> {
+async function dailyQuotaKeyFor(request: Request, env: Env, scope: string): Promise<string> {
   const date = new Date().toISOString().slice(0, 10);
   const ip = request.headers.get("CF-Connecting-IP") || "local";
-  const key = await deriveDailyQuotaKey({
+  return deriveDailyQuotaKey({
     scope,
     date,
     clientAddress: ip,
     secret: env.RATE_LIMIT_HMAC_KEY,
   });
+}
+
+/**
+ * Give back one charge when a scan died to a resolver outage before it could
+ * analyse anything. Clamped at zero so a refunded charge can never go negative.
+ */
+async function refundRateLimit(request: Request, env: Env, quota: QuotaPolicy): Promise<void> {
+  const date = new Date().toISOString().slice(0, 10);
+  const key = await dailyQuotaKeyFor(request, env, quota.scope);
+  await env.DB.prepare(`
+    UPDATE rate_limits
+    SET request_count = MAX(request_count - 1, 0), updated_at = ?
+    WHERE client_key = ? AND window_date = ?
+  `).bind(new Date().toISOString(), key, date).run();
+}
+
+async function enforceScopedDailyRateLimit(request: Request, env: Env, scope: string, limit: number, label: string): Promise<void> {
+  const date = new Date().toISOString().slice(0, 10);
+  const key = await dailyQuotaKeyFor(request, env, scope);
   const now = new Date().toISOString();
   const row = await env.DB.prepare(`
     INSERT INTO rate_limits (client_key, window_date, request_count, updated_at)

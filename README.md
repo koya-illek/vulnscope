@@ -24,7 +24,9 @@ Daily quota identifiers use a scope-specific HMAC and never store the source
 IP address. Before the first production deployment, generate a random secret
 of at least 32 bytes and store it with
 `cd api && npx wrangler secret put RATE_LIMIT_HMAC_KEY`. Do not put the
-production value in `wrangler.toml` or `.dev.vars`.
+production value in `wrangler.toml` or `.dev.vars`. Validation failures and
+recent-scan cache hits are uncharged, and a scan aborted by a VulnScope
+resolver outage is refunded so the invited retry is free.
 
 ## Agent integrations
 
@@ -60,6 +62,10 @@ curl -sS https://scan.illek.ie/api/scans/<reportId>
 curl -sSOJ https://scan.illek.ie/api/scans/<reportId>/export
 # The same export as a Markdown document for tickets and review docs
 curl -sSOJ "https://scan.illek.ie/api/scans/<reportId>/export?format=markdown"
+# Poll without re-downloading: revalidate the ETag from the previous 200
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  -H 'If-None-Match: "<etag-from-previous-response>"' \
+  https://scan.illek.ie/api/scans/<reportId>
 
 # MCP: initialize, then call a tool (stateless; no session handshake needed)
 curl -sS -X POST https://scan.illek.ie/mcp/v2 \
