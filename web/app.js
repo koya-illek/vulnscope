@@ -35,6 +35,7 @@
   // Comparison fetches are auxiliary to the main run lock: their own token
   // invalidates in-flight loads when the viewed report changes mid-flight.
   let compareToken = 0;
+  let compareAbort = null;
 
   // Stage order mirrors the backend pipeline: recon/dns/fetch/ssl, then
   // headers/cookies, fingerprint, paths, then cors/secrets/wordpress/methods/
@@ -370,8 +371,10 @@
     state.report = report;
     state.isExample = example;
     // Any in-flight comparison belongs to a report that is no longer on
-    // screen; invalidate it before swapping views.
+    // screen; invalidate it and tear down its fetch before swapping views.
     compareToken += 1;
+    compareAbort?.abort();
+    compareAbort = null;
     $("#comparison-panel").classList.add("hidden");
     $("#compare-previous").disabled = false;
     $("#compare-previous").textContent = "Compare with previous";
@@ -475,6 +478,7 @@
       : null;
     button.classList.toggle("hidden", !previous);
     delete button.dataset.previousId;
+    button.removeAttribute("title");
     if (previous) {
       button.dataset.previousId = previous.id;
       const when = new Date(previous.createdAt).toLocaleString();
@@ -485,11 +489,15 @@
   async function compareWithPrevious(previousId) {
     if (!state.report || busy) return;
     const token = ++compareToken;
+    // Viewing a different report tears this fetch down instead of letting an
+    // abandoned download linger, matching scan-stream behaviour.
+    const abort = new AbortController();
+    compareAbort = abort;
     const button = $("#compare-previous");
     button.disabled = true;
     button.textContent = "Comparing…";
     try {
-      const response = await fetch(`${API_BASE}/api/scans/${encodeURIComponent(previousId)}`);
+      const response = await fetch(`${API_BASE}/api/scans/${encodeURIComponent(previousId)}`, { signal: abort.signal });
       let payload = null;
       try { payload = await response.json(); } catch { /* handled below */ }
       if (token !== compareToken) return;
@@ -501,6 +509,7 @@
       if (token !== compareToken) return;
       renderComparisonMessage(friendlyError(error));
     } finally {
+      if (compareAbort === abort) compareAbort = null;
       if (token === compareToken) {
         button.disabled = false;
         button.textContent = "Compare with previous";

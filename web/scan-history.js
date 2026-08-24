@@ -182,12 +182,19 @@
   }
 
   const rootTarget = typeof window === "undefined" ? globalThis : window;
+  // Merely touching window.localStorage can throw (blocked cookies, some
+  // privacy modes); the whole module must still load, so acquire it safely.
+  function defaultStorage() {
+    try {
+      return typeof rootTarget.localStorage !== "undefined" ? rootTarget.localStorage : null;
+    } catch {
+      return null;
+    }
+  }
   rootTarget.VulnScopeHistory = {
     createHistory,
     compareReports,
     formatRelative,
-    history: createHistory({
-      storage: typeof rootTarget.localStorage !== "undefined" ? rootTarget.localStorage : null,
-    }),
+    history: createHistory({ storage: defaultStorage() }),
   };
 })(typeof window === "undefined" ? globalThis : window);

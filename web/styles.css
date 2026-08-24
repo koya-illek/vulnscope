@@ -892,6 +892,8 @@ dialog h2 { margin: 0 0 30px; font-size: 32px; letter-spacing: -.04em; }
   .finding-card, .detail-row, .header-audit-row, .cookie-row,
   .path-row, .cors-row, .takeover-row, .grade-section, .panel-header,
   .comparison-finding { break-inside: avoid; }
+  /* Paper cannot dismiss anything; the close affordance is screen-only. */
+  .comparison-close { display: none; }
   .findings-list, .details-panel, .observation-note, .report-header { break-inside: auto; }
   .cs-body { overflow: visible; }
   /* Paper and PDF cannot click the address bar: print the report's own link. */
