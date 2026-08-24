@@ -161,7 +161,7 @@ export default {
         const ifNoneMatch = request.headers.get("If-None-Match");
         if (match[2]) {
           const format = url.searchParams.get("format");
-          if (format && !["json", "markdown", "md"].includes(format)) {
+          if (format && !["json", "markdown"].includes(format)) {
             return json({ error: "Unsupported export format." }, 400, cors);
           }
           // Stored fields are trusted in aggregate but not per-field on

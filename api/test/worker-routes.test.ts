@@ -104,13 +104,15 @@ describe("report export contract", () => {
   });
 
   it("rejects unknown export formats instead of silently returning JSON", async () => {
-    const response = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop/export?format=pdf"),
-      envWithRow({ report_json: storedReportJson("example.com") }),
-      ctx,
-    );
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ error: "Unsupported export format." });
+    for (const format of ["pdf", "md"]) {
+      const response = await worker.fetch(
+        new Request(`https://scan.illek.ie/api/scans/abcdefghijklmnop/export?format=${format}`),
+        envWithRow({ report_json: storedReportJson("example.com") }),
+        ctx,
+      );
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: "Unsupported export format." });
+    }
   });
 
   it("treats HEAD on a report route like GET instead of a JSON 404 miss", async () => {
