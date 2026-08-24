@@ -323,6 +323,26 @@
     errorPanel.focus({ preventScroll: true });
   }
 
+  // ─── Printing ─────────────────────────────────────────────────────
+
+  // Evidence lives in collapsible sections on screen; a printed handoff must
+  // carry all of it regardless of each section's on-screen state. The
+  // viewer's own open/closed choices are restored afterwards.
+  let printOpenState = null;
+  window.addEventListener("beforeprint", () => {
+    if (!state.report) return;
+    const sections = $$("details.collapsible-section");
+    printOpenState = sections.map((section) => section.open);
+    sections.forEach((section) => { section.open = true; });
+  });
+  window.addEventListener("afterprint", () => {
+    if (!printOpenState) return;
+    $$("details.collapsible-section").forEach((section, index) => {
+      section.open = Boolean(printOpenState[index]);
+    });
+    printOpenState = null;
+  });
+
   // ─── Report rendering ─────────────────────────────────────────────
 
   function displayReport(report, updateLocation, { example = false } = {}) {

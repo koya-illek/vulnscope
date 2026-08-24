@@ -761,3 +761,38 @@ dialog h2 { margin: 0 0 30px; font-size: 32px; letter-spacing: -.04em; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+/* Printed handoff: the report is the artifact people put on paper, so print
+   keeps only the report section and flips to an ink-friendly light palette.
+   Severity hues are redefined here too — every component colour routes
+   through these custom properties. The SAMPLE DATA badge deliberately stays
+   so a printed example can never pass for a real scan. */
+@media print {
+  :root {
+    color-scheme: light;
+    --bg: #fff;
+    --surface: #fff;
+    --surface-2: #f6f4f2;
+    --line: rgba(0, 0, 0, .25);
+    --line-bright: rgba(0, 0, 0, .45);
+    --text: #111;
+    --muted: #444;
+    --muted-2: #555;
+    --accent: #9c3313;
+    --accent-2: #7a2a10;
+    --warning: #8a5a00;
+    --critical: #a11d2c;
+    --info: #1d4f91;
+    --high: #8a5a00;
+  }
+  body { background: var(--bg); color: var(--text); font-size: 11pt; min-width: 0; }
+  .grid-field, .skip-link, .site-header, .hero, .progress-panel,
+  .error-panel, .principles, .developer-access, footer, dialog,
+  .report-actions, .filter-set { display: none !important; }
+  main { width: 100%; }
+  .report { border: 0; padding: 0; box-shadow: none; }
+  a { text-decoration: none; color: inherit; }
+  .finding-card, .detail-row, .header-audit-row, .cookie-row,
+  .path-row, .cors-row, .takeover-row, .grade-section, .panel-header { break-inside: avoid; }
+  .findings-list, .details-panel, .observation-note, .report-header { break-inside: auto; }
+  .cs-body { overflow: visible; }
+}
