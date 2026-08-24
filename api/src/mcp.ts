@@ -3,8 +3,24 @@ import { BlockedTargetError, InputError, RateLimitError, ResolverUnavailableErro
 import { OutboundPolicyError } from "./outbound";
 import { decodeUtf8, readBoundedRequestBody, RequestBodyError } from "./http-body";
 
-const MCP_PROTOCOL_VERSION = "2025-11-25";
+import { VERSION } from "./version";
+
+/**
+ * Protocol versions this endpoint answers. A client-pinned version that the
+ * tool surface actually supports is echoed back so older agents do not
+ * disconnect; anything else (including a missing request) receives the latest
+ * supported version, per the spec's negotiation rule.
+ */
+const SUPPORTED_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18"] as const;
+const LATEST_PROTOCOL_VERSION = "2025-11-25";
 const MAX_MCP_REQUEST_BYTES = 16 * 1024;
+
+function negotiateProtocolVersion(requested: unknown): string {
+  return typeof requested === "string" && requested.length > 0
+    && (SUPPORTED_PROTOCOL_VERSIONS as readonly string[]).includes(requested)
+    ? requested
+    : LATEST_PROTOCOL_VERSION;
+}
 
 export interface VulnScopeMcpInput {
   url: string;
@@ -55,12 +71,16 @@ export async function handleMcp(
   if (message.method.startsWith("notifications/") || id === undefined) return new Response(null, { status: 202 });
 
   if (message.method === "initialize") {
+    const requested = message.params && typeof message.params === "object"
+      ? (message.params as Record<string, unknown>).protocolVersion
+      : undefined;
+    const protocolVersion = negotiateProtocolVersion(requested);
     return rpcResult(id, {
-      protocolVersion: MCP_PROTOCOL_VERSION,
+      protocolVersion,
       capabilities: { tools: { listChanged: false } },
-      serverInfo: { name: "vulnscope", title: "VulnScope", version: "2.0.0" },
+      serverInfo: { name: "vulnscope", title: "VulnScope", version: VERSION },
       instructions: "Use scan_website for authorised, unauthenticated reconnaissance of a public HTTP or HTTPS site and get_vulnscope_report to retrieve an unexpired shared report. VulnScope does not exploit vulnerabilities, submit forms, or bypass authentication.",
-    });
+    }, protocolVersion);
   }
   if (message.method === "ping") return rpcResult(id, {});
   if (message.method === "tools/list") return rpcResult(id, { tools: [scanTool(), reportTool()] });
@@ -187,21 +207,21 @@ async function readMessage(request: Request): Promise<Record<string, unknown>> {
   return parsed as Record<string, unknown>;
 }
 
-function rpcResult(id: string | number | null, result: unknown): Response {
-  return rpc({ jsonrpc: "2.0", id, result });
+function rpcResult(id: string | number | null, result: unknown, protocolVersion = LATEST_PROTOCOL_VERSION): Response {
+  return rpc({ jsonrpc: "2.0", id, result }, 200, protocolVersion);
 }
 
 function rpcError(id: string | number | null, code: number, message: string, status = 200): Response {
   return rpc({ jsonrpc: "2.0", id, error: { code, message } }, status);
 }
 
-function rpc(payload: unknown, status = 200): Response {
+function rpc(payload: unknown, status = 200, protocolVersion = LATEST_PROTOCOL_VERSION): Response {
   return new Response(JSON.stringify(payload), {
     status,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
-      "MCP-Protocol-Version": MCP_PROTOCOL_VERSION,
+      "MCP-Protocol-Version": protocolVersion,
       "X-Content-Type-Options": "nosniff",
       "X-Robots-Tag": "noindex, nofollow",
     },

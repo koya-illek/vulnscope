@@ -13,8 +13,9 @@ import type { CoverageStatus, Env, Finding, OutboundRequestSummary, ScanCoverage
 import { handleMcp } from "./mcp";
 import { deriveDailyQuotaKey } from "./quota";
 import { decodeUtf8, readBoundedRequestBody, RequestBodyError } from "./http-body";
+import { VERSION, WEBSITE_ORIGIN } from "./version";
 
-const API_VERSION = "2.0.0";
+const API_VERSION = VERSION;
 const REPORT_SCHEMA_VERSION = 2;
 const REPORT_ID = /^[A-Za-z0-9_-]{16}$/;
 const MAX_REQUEST_BYTES = 8192;
@@ -114,7 +115,7 @@ export default {
         return json({
           service: "VulnScanner API",
           version: API_VERSION,
-          website: "https://scan.illek.ie",
+          website: WEBSITE_ORIGIN,
           endpoints: {
             health: "GET /api/health",
             createScan: "POST /api/scans",

@@ -2,8 +2,9 @@ import { getDomain } from "tldts";
 import { isIpLiteral, isPublicIp, isValidHostname } from "./security";
 import { queryDnsWithFallback } from "./dns";
 import type { OutboundRequestSummary } from "./types";
+import { VERSION, WEBSITE_ORIGIN } from "./version";
 
-export const USER_AGENT = "VulnScanner/2.1 (+https://scan.illek.ie)";
+export const USER_AGENT = `VulnScanner/${VERSION} (+${WEBSITE_ORIGIN})`;
 
 export interface BodyReadResult {
   text: string;

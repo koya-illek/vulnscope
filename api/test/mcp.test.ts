@@ -31,6 +31,22 @@ describe("VulnScope MCP", () => {
     await expect(response.json()).resolves.toMatchObject({ result: { serverInfo: { name: "vulnscope", version: "2.0.0" } } });
   });
 
+  it("echoes a client-pinned older supported protocol version", async () => {
+    const response = await handleMcp(rpc("initialize", { protocolVersion: "2025-06-18" }), async () => report);
+    expect(response.headers.get("mcp-protocol-version")).toBe("2025-06-18");
+    const body = await response.json<{ result: { protocolVersion: string } }>();
+    expect(body.result.protocolVersion).toBe("2025-06-18");
+  });
+
+  it("answers unsupported or missing version requests with the latest version", async () => {
+    for (const params of [{ protocolVersion: "1999-01-01" }, {}, undefined]) {
+      const response = await handleMcp(rpc("initialize", params), async () => report);
+      expect(response.headers.get("mcp-protocol-version")).toBe("2025-11-25");
+      const body = await response.json<{ result: { protocolVersion: string } }>();
+      expect(body.result.protocolVersion).toBe("2025-11-25");
+    }
+  });
+
   it("publishes scan and report retrieval tools with complete schemas", async () => {
     const response = await handleMcp(rpc("tools/list"), async () => report);
     const body = await response.json<{ result: { tools: Array<{ name: string; description: string; inputSchema: object; outputSchema: object }> } }>();
