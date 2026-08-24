@@ -35,12 +35,38 @@ POST https://scan.illek.ie/mcp
 POST https://scan.illek.ie/mcp/v2
 ```
 
-The MCP endpoints implement stateless JSON-RPC over HTTP with protocol
-version `2025-11-25` and publish `scan_website` plus
-`get_vulnscope_report`. REST scan progress uses newline-delimited JSON
-(`application/x-ndjson`). Copilot Studio can import
+The MCP endpoints implement stateless JSON-RPC over HTTP, negotiate
+`2025-11-25` (echoing a client-pinned `2025-06-18` when requested), and
+publish `scan_website` plus `get_vulnscope_report`. REST scan progress uses
+newline-delimited JSON (`application/x-ndjson`). Copilot Studio can import
 `https://scan.illek.ie/mcp-copilot.yaml`; OpenAPI agents can import
 `https://scan.illek.ie/openapi.yaml`.
+
+### Quickstart
+
+```sh
+# Create a scan (201 with the full report; charges the daily web quota)
+curl -sS -X POST https://scan.illek.ie/api/v2/scan \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "example.com", "probePaths": false, "checkTakeover": false}'
+
+# The same scan with newline-delimited progress events
+curl -sS -X POST https://scan.illek.ie/api/scans/stream \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "example.com"}'
+
+# Read or export an unexpired report by its 16-character ID
+curl -sS https://scan.illek.ie/api/scans/<reportId>
+curl -sSOJ https://scan.illek.ie/api/scans/<reportId>/export
+
+# MCP: initialize, then call a tool (stateless; no session handshake needed)
+curl -sS -X POST https://scan.illek.ie/mcp/v2 \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25"}}'
+curl -sS -X POST https://scan.illek.ie/mcp/v2 \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"scan_website","arguments":{"url":"example.com"}}}'
+```
 
 ## Release checks
 
