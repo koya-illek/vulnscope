@@ -115,7 +115,8 @@ export default {
         return response;
       }
 
-      if ((url.pathname === "/api" || url.pathname === "/api/" || url.pathname === "/api/v2") && request.method === "GET") {
+      if (url.pathname === "/api" || url.pathname === "/api/" || url.pathname === "/api/v2") {
+        if (request.method !== "GET") return methodNotAllowed("GET", cors);
         return json({
           service: "VulnScanner API",
           version: API_VERSION,
@@ -132,7 +133,8 @@ export default {
         }, 200, cors);
       }
 
-      if (url.pathname === "/api/health" && request.method === "GET") {
+      if (url.pathname === "/api/health") {
+        if (request.method !== "GET") return methodNotAllowed("GET", cors);
         return json({
           ok: true,
           service: "vuln-scanner-api",
@@ -143,7 +145,8 @@ export default {
         }, 200, cors);
       }
 
-      if ((url.pathname === "/api/scans" || url.pathname === "/api/scans/stream" || url.pathname === "/api/v2/scan") && request.method === "POST") {
+      if (isScanPath(url.pathname)) {
+        if (request.method !== "POST") return methodNotAllowed("POST", cors);
         if (request.headers.get("Origin") && !origin) return json({ error: "Origin not allowed" }, 403, cors);
         const input = await readScanInput(request);
         if (url.pathname.endsWith("/stream")) {
@@ -154,7 +157,11 @@ export default {
       }
 
       const match = url.pathname.match(/^\/api\/scans\/([A-Za-z0-9_-]+)(\/export)?$/);
-      if (match && request.method === "GET") {
+      if (match) {
+        // HEAD arrives rewritten to GET, so GET is genuinely the only method
+        // this resource answers; anything else names that in Allow instead of
+        // disguising itself as a missing resource.
+        if (request.method !== "GET") return methodNotAllowed("GET", cors);
         if (!REPORT_ID.test(match[1])) return json({ error: "Report not found" }, 404, cors);
         const report = await loadReport(env.DB, match[1]);
         if (!report) return json({ error: "Report not found or expired" }, 404, cors);
@@ -227,6 +234,10 @@ export default {
 
 function isLocalDevelopmentHost(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+}
+
+function isScanPath(pathname: string): boolean {
+  return pathname === "/api/scans" || pathname === "/api/scans/stream" || pathname === "/api/v2/scan";
 }
 
 interface ScanInput {
@@ -788,6 +799,14 @@ function json(payload: unknown, status = 200, extra: Record<string, string> = {}
       ...extra,
     },
   });
+}
+
+/**
+ * Known resource, unsupported method: name the method set in Allow so agents
+ * can self-correct instead of guessing whether the path itself exists.
+ */
+function methodNotAllowed(allow: string, cors: Record<string, string>): Response {
+  return json({ error: `Method not allowed. Use ${allow}.` }, 405, { ...cors, Allow: allow });
 }
 
 function addResponseHeaders(response: Response, extra: Record<string, string>): Response {

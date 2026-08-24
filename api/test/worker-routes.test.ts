@@ -251,6 +251,50 @@ describe("stream endpoint contract", () => {
   });
 });
 
+describe("method discipline on known resources", () => {
+  const env = envWithRow(null);
+
+  it("names POST in Allow when a scan resource gets another method", async () => {
+    for (const path of ["/api/v2/scan", "/api/scans", "/api/scans/stream"]) {
+      const response = await worker.fetch(new Request(`https://scan.illek.ie${path}`, { method: "GET" }), env, ctx);
+      expect(response.status).toBe(405);
+      expect(response.headers.get("allow")).toBe("POST");
+      await expect(response.json()).resolves.toEqual({ error: "Method not allowed. Use POST." });
+    }
+  });
+
+  it("names GET in Allow when report and discovery resources get other methods", async () => {
+    for (const path of [
+      "/api/scans/abcdefghijklmnop",
+      "/api/scans/abcdefghijklmnop/export",
+      "/api",
+      "/api/v2",
+      "/api/health",
+    ]) {
+      const response = await worker.fetch(new Request(`https://scan.illek.ie${path}`, { method: "DELETE" }), env, ctx);
+      expect(response.status).toBe(405);
+      expect(response.headers.get("allow")).toBe("GET");
+    }
+
+    const posted = await worker.fetch(
+      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop", { method: "POST", body: "{}" }),
+      env,
+      ctx,
+    );
+    expect(posted.status).toBe(405);
+    expect(posted.headers.get("allow")).toBe("GET");
+  });
+
+  it("keeps OPTIONS answering 204 ahead of the per-resource checks", async () => {
+    const response = await worker.fetch(
+      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop", { method: "OPTIONS" }),
+      envWithRow(null),
+      ctx,
+    );
+    expect(response.status).toBe(204);
+  });
+});
+
 describe("static and discovery surfaces", () => {
   it("adds HSTS to asset responses even when the asset server omits it", async () => {
     const response = await worker.fetch(
