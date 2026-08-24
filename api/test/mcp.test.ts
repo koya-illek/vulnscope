@@ -171,6 +171,17 @@ describe("VulnScope MCP", () => {
     }
   });
 
+  it("tells the agent when an exhausted daily window resets", async () => {
+    const response = await handleMcp(rpc("tools/call", { name: "scan_website", arguments: { url: "https://example.com" } }), async () => {
+      throw new RateLimitError("Daily scan limit of 10 reached.", 10, 11, "2026-08-22T23:59:59.999Z");
+    });
+    const body = await response.json<{ result: { content: Array<{ text: string }>; isError: boolean } }>();
+    expect(body.result.isError).toBe(true);
+    expect(body.result.content[0].text).toBe(
+      "Daily scan limit of 10 reached. Quota resets at 2026-08-22T23:59:59.999Z.",
+    );
+  });
+
   it("sanitises only unexpected errors, preserving known classes", () => {
     const input = new InputError("A URL is required.");
     const blocked = new BlockedTargetError("nope");

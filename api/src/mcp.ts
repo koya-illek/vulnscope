@@ -118,7 +118,12 @@ export async function handleMcp(
       isError: false,
     });
   } catch (error) {
-    const text = sanitizeToolError(error).message;
+    let text = sanitizeToolError(error).message;
+    if (error instanceof RateLimitError) {
+      // Agents plan retries; unlike REST headers, a JSON-RPC result has no
+      // side channel, so the daily-window reset belongs in the text itself.
+      text += ` Quota resets at ${error.resetAt}.`;
+    }
     return rpcResult(id, { content: [{ type: "text", text }], isError: true });
   }
 }
