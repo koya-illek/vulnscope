@@ -123,6 +123,90 @@ describe("report export contract", () => {
   });
 });
 
+describe("conditional report reads", () => {
+  it("serves an ETag and answers a matching If-None-Match with a bodiless 304", async () => {
+    const row = { report_json: storedReportJson("example.com") };
+    const first = await worker.fetch(
+      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop"),
+      envWithRow(row),
+      ctx,
+    );
+    expect(first.status).toBe(200);
+    const etag = first.headers.get("etag") || "";
+    expect(etag).toMatch(/^"[0-9a-f]{32}"$/);
+
+    const revalidated = await worker.fetch(
+      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop", { headers: { "If-None-Match": etag } }),
+      envWithRow(row),
+      ctx,
+    );
+    expect(revalidated.status).toBe(304);
+    expect(revalidated.headers.get("etag")).toBe(etag);
+    expect(await revalidated.text()).toBe("");
+
+    const stale = await worker.fetch(
+      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop", { headers: { "If-None-Match": '"00000000000000000000000000000000"' } }),
+      envWithRow(row),
+      ctx,
+    );
+    expect(stale.status).toBe(200);
+  });
+
+  it("honours validator lists and ignores weak tags on strong comparison", async () => {
+    const row = { report_json: storedReportJson("example.com") };
+    const base = await worker.fetch(
+      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop"),
+      envWithRow(row),
+      ctx,
+    );
+    const etag = base.headers.get("etag") || "";
+
+    const listed = await worker.fetch(
+      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop", {
+        headers: { "If-None-Match": `"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ${etag}` },
+      }),
+      envWithRow(row),
+      ctx,
+    );
+    expect(listed.status).toBe(304);
+
+    const weakened = await worker.fetch(
+      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop", {
+        headers: { "If-None-Match": `W/${etag}` },
+      }),
+      envWithRow(row),
+      ctx,
+    );
+    expect(weakened.status).toBe(200);
+  });
+
+  it("validates markdown exports independently of the JSON representation", async () => {
+    const row = { report_json: storedReportJson("example.com") };
+    const markdown = await worker.fetch(
+      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop/export?format=markdown"),
+      envWithRow(row),
+      ctx,
+    );
+    expect(markdown.status).toBe(200);
+    const mdEtag = markdown.headers.get("etag") || "";
+    const json = await worker.fetch(
+      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop/export"),
+      envWithRow(row),
+      ctx,
+    );
+    expect(json.headers.get("etag")).not.toBe(mdEtag);
+
+    const revalidated = await worker.fetch(
+      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop/export?format=markdown", {
+        headers: { "If-None-Match": mdEtag },
+      }),
+      envWithRow(row),
+      ctx,
+    );
+    expect(revalidated.status).toBe(304);
+  });
+});
+
 describe("stream endpoint contract", () => {
   async function postStream(body: string, contentType = "application/json"): Promise<Response> {
     return worker.fetch(new Request("https://scan.illek.ie/api/scans/stream", {

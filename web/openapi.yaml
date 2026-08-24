@@ -69,10 +69,17 @@ paths:
     get:
       operationId: getVulnScopeReport
       summary: Retrieve an unexpired scan report
+      description: Stored reports are immutable, so the response carries a strong ETag; send it as If-None-Match to revalidate without re-downloading.
       parameters:
         - { name: reportId, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{16}$' } }
+        - { name: If-None-Match, in: header, required: false, schema: { type: string }, description: 'A previously received ETag, a comma-separated list of validators, or *.' }
       responses:
-        '200': { description: Stored scan report, content: { application/json: { schema: { $ref: '#/components/schemas/ScanReport' } } } }
+        '200':
+          description: Stored scan report
+          headers:
+            ETag: { schema: { type: string }, description: Strong validator over the returned representation. }
+          content: { application/json: { schema: { $ref: '#/components/schemas/ScanReport' } } }
+        '304': { $ref: '#/components/responses/NotModified' }
         '404': { description: Report not found or expired }
   /api/scans/{reportId}/export:
     get:
@@ -88,11 +95,14 @@ paths:
       responses:
         '200':
           description: Report attachment in the requested format
+          headers:
+            ETag: { schema: { type: string }, description: Strong validator over the returned representation; send as If-None-Match to revalidate. }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ScanReport' }
             text/markdown:
               schema: { type: string }
+        '304': { $ref: '#/components/responses/NotModified' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '404': { description: Report not found or expired }
 components:
@@ -224,6 +234,10 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+    NotModified:
+      description: The stored representation still matches the supplied If-None-Match validator; the body is empty.
+      headers:
+        ETag: { schema: { type: string }, description: The validator that satisfied the conditional request. }
     RateLimited:
       description: Request limit reached
       headers:

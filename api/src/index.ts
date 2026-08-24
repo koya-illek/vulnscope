@@ -155,6 +155,10 @@ export default {
         if (!REPORT_ID.test(match[1])) return json({ error: "Report not found" }, 404, cors);
         const report = await loadReport(env.DB, match[1]);
         if (!report) return json({ error: "Report not found or expired" }, 404, cors);
+        // Stored reports are immutable once written and the read-path
+        // normalisation is deterministic, so a content hash is an honest
+        // strong ETag; polling agents can revalidate instead of re-downloading.
+        const ifNoneMatch = request.headers.get("If-None-Match");
         if (match[2]) {
           const format = url.searchParams.get("format");
           if (format && !["json", "markdown", "md"].includes(format)) {
@@ -164,27 +168,47 @@ export default {
           // migrated or corrupted rows; never let them steer header syntax.
           const fileSlug = (value: string) => value.replace(/[^A-Za-z0-9.-]+/g, "-").replace(/^-+|-+$/g, "") || "report";
           if (format && format !== "json") {
-            return new Response(reportToMarkdown(report), {
+            const markdown = reportToMarkdown(report);
+            const etag = await etagFor(markdown);
+            if (matchesIfNoneMatch(ifNoneMatch, etag)) return notModified(etag, cors);
+            return new Response(markdown, {
               headers: {
                 ...cors,
                 "Content-Type": "text/markdown; charset=utf-8",
                 "Content-Disposition": `attachment; filename="vulnscope-${fileSlug(report.hostname)}-${fileSlug(report.id)}.md"`,
                 "Cache-Control": "private, no-store",
+                ETag: etag,
                 ...securityHeaders(),
               },
             });
           }
-          return new Response(JSON.stringify(report, null, 2), {
+          const body = JSON.stringify(report, null, 2);
+          const etag = await etagFor(body);
+          if (matchesIfNoneMatch(ifNoneMatch, etag)) return notModified(etag, cors);
+          return new Response(body, {
             headers: {
               ...cors,
               "Content-Type": "application/json; charset=utf-8",
               "Content-Disposition": `attachment; filename="vulnscope-${fileSlug(report.hostname)}-${fileSlug(report.id)}.json"`,
               "Cache-Control": "private, no-store",
+              ETag: etag,
               ...securityHeaders(),
             },
           });
         }
-        return json(report, 200, { ...cors, "Cache-Control": "private, no-store" });
+        const body = JSON.stringify(report);
+        const etag = await etagFor(body);
+        if (matchesIfNoneMatch(ifNoneMatch, etag)) return notModified(etag, cors);
+        return new Response(body, {
+          status: 200,
+          headers: {
+            ...cors,
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "private, no-store",
+            ETag: etag,
+            ...securityHeaders(),
+          },
+        });
       }
 
       return json({ error: "Not found" }, 404, cors);
@@ -610,6 +634,28 @@ async function cleanExpired(db: D1Database): Promise<void> {
 function clampInt(value: string | undefined, fallback: number, min: number, max: number): number {
   const parsed = Number.parseInt(value || "", 10);
   return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
+}
+
+async function etagFor(payload: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
+  const hash = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `"${hash.slice(0, 32)}"`;
+}
+
+/**
+ * Strong comparison only (RFC 9110 §8.8.3.2): a weak-tagged or syntactically
+ * different validator never matches, and "*" means "any representation exists".
+ */
+function matchesIfNoneMatch(headerValue: string | null, etag: string): boolean {
+  if (!headerValue) return false;
+  return headerValue.split(",").some((tag) => tag.trim() === "*" || tag.trim() === etag);
+}
+
+function notModified(etag: string, cors: Record<string, string>): Response {
+  return new Response(null, {
+    status: 304,
+    headers: { ...cors, ...securityHeaders(), "Cache-Control": "private, no-store", ETag: etag },
+  });
 }
 
 function corsHeaders(origin: string | null): Record<string, string> {
