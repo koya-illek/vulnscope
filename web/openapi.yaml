@@ -242,6 +242,8 @@ components:
         ETag: { schema: { type: string }, description: The validator that satisfied the conditional request. }
     ServiceUnavailable:
       description: Both public DNS resolvers were unavailable, so the target could not be checked. The request is refunded and may be retried.
+      headers:
+        Retry-After: { schema: { type: integer }, description: Suggested seconds to wait before retrying. }
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }

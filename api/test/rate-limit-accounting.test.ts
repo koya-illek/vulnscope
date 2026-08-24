@@ -143,6 +143,8 @@ describe("quota accounting boundaries", () => {
       );
 
       expect(response.status).toBe(503);
+      // The outage message invites a retry; give agents a concrete interval.
+      expect(response.headers.get("Retry-After")).toBe("60");
       // The charge was written, then given back on the same scoped key.
       const update = executed.find((sql) => sql.includes("UPDATE rate_limits"));
       expect(update).toBeTruthy();

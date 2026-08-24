@@ -21,6 +21,9 @@ const REPORT_SCHEMA_VERSION = 2;
 const REPORT_ID = /^[A-Za-z0-9_-]{16}$/;
 const MAX_REQUEST_BYTES = 8192;
 const RECENT_SCAN_TTL = 300;
+// Advisory backoff for the one retryable failure class this API emits; the
+// outage text already invites a retry, so give agents a concrete interval.
+const RESOLVER_OUTAGE_RETRY_SECONDS = 60;
 
 /**
  * Set-equality assertions between the stored-report validation lists and the
@@ -753,6 +756,9 @@ function errorResponse(error: unknown, cors: Record<string, string>): Response {
   }
   return json({ error: normalized.message }, normalized.status, {
     ...cors,
+    ...(error instanceof ResolverUnavailableError
+      ? { "Retry-After": String(RESOLVER_OUTAGE_RETRY_SECONDS) }
+      : {}),
   });
 }
 
