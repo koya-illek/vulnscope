@@ -22,6 +22,7 @@
   <script src="./config.js" defer></script>
   <script src="./stream-reader.js" defer></script>
   <script src="./report-view.js" defer></script>
+  <script src="./scan-history.js" defer></script>
   <script src="./app.js" defer></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"VulnScope","url":"https://scan.illek.ie/","description":"Run bounded unauthenticated public-site security checks with evidence-backed reports.","applicationCategory":"SecurityApplication","operatingSystem":"Any","browserRequirements":"Requires a modern web browser"}</script>
 </head>
@@ -90,6 +91,15 @@
 
       <p class="example-hint">Not sure what you get? <button class="text-button example-link" id="example-link" type="button">View an example report</button></p>
 
+      <div class="recent-scans hidden" id="recent-scans">
+        <div class="recent-head">
+          <span class="recent-title">RECENT SCANS</span>
+          <span class="recent-note">Stored in this browser only</span>
+          <button class="text-button" id="clear-history" type="button">Clear</button>
+        </div>
+        <ul class="recent-list" id="recent-list"></ul>
+      </div>
+
       <div class="hero-route" aria-hidden="true">
         <span>RECON</span><i></i><span>HEADERS</span><i></i><span>PATHS</span><i></i><span>CORS</span>
       </div>
@@ -152,9 +162,12 @@
           <button class="secondary-button" id="copy-link" type="button">Copy share link</button>
           <button class="secondary-button" id="export-json" type="button">Export JSON</button>
           <button class="secondary-button" id="export-markdown" type="button">Export Markdown</button>
+          <button class="secondary-button hidden" id="compare-previous" type="button">Compare with previous</button>
           <button class="icon-button" id="new-scan" type="button" aria-label="Start a new scan">+</button>
         </div>
       </header>
+
+      <section class="comparison-panel hidden" id="comparison-panel" tabindex="-1"></section>
 
       <div class="grade-section" id="grade-section">
         <div class="grade-badge" id="grade-badge">

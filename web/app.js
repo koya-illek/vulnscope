@@ -15,6 +15,9 @@
   let runToken = 0;
   let activeAbort = null;
   const OBSERVATION_NOTE_SUFFIX = "VulnScope performs unauthenticated checks only. It does not attempt exploitation, submit forms, or bypass authentication. Findings reflect what an external observer can discover without credentials.";
+  // Server-side report IDs are exactly 16 URL-safe characters; the same shape
+  // gate applies to local history entries before they trigger fetches.
+  const REPORT_ID_SHAPE = /^[A-Za-z0-9_-]{16}$/;
 
   const form = $("#scan-form");
   const input = $("#url-input");
@@ -27,6 +30,11 @@
   const reportPanel = $("#report");
   const methodDialog = $("#method-dialog");
   let methodDialogReturnFocus = null;
+  const historyModule = window.VulnScopeHistory || null;
+  const scanHistory = historyModule ? historyModule.history : null;
+  // Comparison fetches are auxiliary to the main run lock: their own token
+  // invalidates in-flight loads when the viewed report changes mid-flight.
+  let compareToken = 0;
 
   // Stage order mirrors the backend pipeline: recon/dns/fetch/ssl, then
   // headers/cookies, fingerprint, paths, then cors/secrets/wordpress/methods/
@@ -93,6 +101,19 @@
   $("#copy-link").addEventListener("click", copyShareLink);
   $("#export-json").addEventListener("click", exportJson);
   $("#export-markdown").addEventListener("click", exportMarkdown);
+  $("#compare-previous").addEventListener("click", () => {
+    const id = $("#compare-previous").dataset.previousId;
+    if (id) compareWithPrevious(id);
+  });
+  $("#clear-history").addEventListener("click", () => {
+    if (scanHistory) scanHistory.clear();
+    renderRecentScans();
+  });
+  $("#recent-list").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-report-id]");
+    if (!button || busy || !REPORT_ID_SHAPE.test(button.dataset.reportId)) return;
+    loadReport(button.dataset.reportId, { trackHistory: true });
+  });
   $("#method-button").addEventListener("click", (event) => openMethodDialog(event.currentTarget));
   $("#footer-method-button").addEventListener("click", (event) => openMethodDialog(event.currentTarget));
   $("#dialog-close").addEventListener("click", () => methodDialog.close());
@@ -348,6 +369,16 @@
   function displayReport(report, updateLocation, { example = false } = {}) {
     state.report = report;
     state.isExample = example;
+    // Any in-flight comparison belongs to a report that is no longer on
+    // screen; invalidate it before swapping views.
+    compareToken += 1;
+    $("#comparison-panel").classList.add("hidden");
+    $("#compare-previous").disabled = false;
+    $("#compare-previous").textContent = "Compare with previous";
+    if (!example && scanHistory && REPORT_ID_SHAPE.test(report.id || "")) {
+      scanHistory.record(report);
+      renderRecentScans();
+    }
     $("#report-host").textContent = report.hostname;
     // Sample reports point at the reserved .example domain; a dead link to a
     // non-resolving host teaches nothing, so only real reports become live.
@@ -360,6 +391,7 @@
       $("#example-badge").classList.add("hidden");
       ["#copy-link", "#export-json", "#export-markdown", "#new-scan"].forEach((selector) => $(selector).classList.remove("hidden"));
     }
+    updateCompareButton(report, example);
     const requestedUrl = report.requestedUrl || report.url || `https://${report.hostname}`;
     const targetLink = $("#report-url");
     targetLink.textContent = requestedUrl;
@@ -410,6 +442,130 @@
       // screen-reader focus still needs to land on the new context.
       $("#report-host").focus({ preventScroll: true });
     }, 280);
+  }
+
+  // ─── Local history: recent list + previous-scan comparison ───────
+
+  function renderRecentScans() {
+    const container = $("#recent-scans");
+    const list = $("#recent-list");
+    if (!scanHistory) return;
+    const entries = scanHistory.entries();
+    container.classList.toggle("hidden", entries.length === 0);
+    if (!entries.length) return;
+    const nowMs = Date.now();
+    list.innerHTML = entries.map((entry) => {
+      const total = entry.critical + entry.high + entry.medium + entry.low + entry.info;
+      const tone = entry.grade && /^[A-F]$/.test(entry.grade) ? entry.grade.toLowerCase() : "";
+      const meta = entry.status === "failed"
+        ? "Scan did not complete"
+        : `${total} finding${total === 1 ? "" : "s"} · ${historyModule.formatRelative(entry.createdAt, nowMs)}`;
+      return `<li><button type="button" data-report-id="${escapeHtml(entry.id)}" ${busy ? "disabled" : ""}>
+        <span class="recent-grade ${tone ? `grade-chip-${tone}` : ""}">${entry.grade && entry.status !== "failed" ? escapeHtml(entry.grade) : "—"}</span>
+        <span class="recent-host">${escapeHtml(entry.hostname)}</span>
+        <span class="recent-meta">${escapeHtml(meta)}</span>
+      </button></li>`;
+    }).join("");
+  }
+
+  function updateCompareButton(report, example) {
+    const button = $("#compare-previous");
+    const previous = !example && scanHistory && REPORT_ID_SHAPE.test(report.id || "")
+      ? scanHistory.previousEntryFor(report)
+      : null;
+    button.classList.toggle("hidden", !previous);
+    delete button.dataset.previousId;
+    if (previous) {
+      button.dataset.previousId = previous.id;
+      const when = new Date(previous.createdAt).toLocaleString();
+      button.title = `Against the ${when} scan of ${previous.hostname} (${previous.id})`;
+    }
+  }
+
+  async function compareWithPrevious(previousId) {
+    if (!state.report || busy) return;
+    const token = ++compareToken;
+    const button = $("#compare-previous");
+    button.disabled = true;
+    button.textContent = "Comparing…";
+    try {
+      const response = await fetch(`${API_BASE}/api/scans/${encodeURIComponent(previousId)}`);
+      let payload = null;
+      try { payload = await response.json(); } catch { /* handled below */ }
+      if (token !== compareToken) return;
+      if (!response.ok) throw new Error((payload && payload.error) || "The earlier report could not be loaded.");
+      const comparison = historyModule.compareReports(payload, state.report);
+      if (!comparison) throw new Error("The earlier scan is not comparable with this one.");
+      renderComparison(comparison);
+    } catch (error) {
+      if (token !== compareToken) return;
+      renderComparisonMessage(friendlyError(error));
+    } finally {
+      if (token === compareToken) {
+        button.disabled = false;
+        button.textContent = "Compare with previous";
+      }
+    }
+  }
+
+  function renderComparison(comparison) {
+    const panel = $("#comparison-panel");
+    const deltaCells = comparison.severityDeltas.map(({ severity, from, to }) => {
+      const delta = to - from;
+      const direction = delta > 0 ? "delta-worse" : delta < 0 ? "delta-better" : "delta-flat";
+      const text = delta > 0 ? `+${delta}` : delta < 0 ? `${delta}` : "±0";
+      return `<div class="delta-cell"><small>${escapeHtml(severity)}</small><strong class="${direction}">${text}</strong></div>`;
+    }).join("");
+    const gradeFrom = escapeHtml(comparison.grades.from || "—");
+    const gradeTo = escapeHtml(comparison.grades.to || "—");
+    panel.innerHTML = `
+      <div class="comparison-head">
+        <span class="comparison-label">COMPARISON</span>
+        <span class="comparison-meta">Against ${escapeHtml(comparison.hostname)} report ${escapeHtml(comparison.previousId || "")}</span>
+        <button type="button" class="comparison-close" aria-label="Dismiss comparison">×</button>
+      </div>
+      <div class="comparison-body">
+        <div class="grade-transition"><span class="grade-from">${gradeFrom}</span><span class="grade-arrow" aria-hidden="true">→</span><span class="grade-to">${gradeTo}</span></div>
+        <div class="delta-grid">${deltaCells}</div>
+      </div>
+      ${findingList("New findings", comparison.added, "added")}
+      ${findingList("Resolved findings", comparison.resolved, "resolved")}
+      <p class="comparison-note">Findings are matched by their stable IDs; counts come from each report's own summary.</p>`;
+    panel.querySelector(".comparison-close").addEventListener("click", () => {
+      panel.classList.add("hidden");
+      $("#report-host").focus({ preventScroll: true });
+    });
+    panel.classList.remove("hidden");
+    // Focus announces the finished comparison to assistive technology the
+    // same way the error panel announces failures.
+    panel.focus({ preventScroll: true });
+    scrollToElement(panel, "center");
+  }
+
+  function findingList(heading, findings, kind) {
+    if (!findings.length) return `<p class="comparison-empty">${heading}: none.</p>`;
+    return `<div class="comparison-findings">
+      <h4>${escapeHtml(heading)} <span class="cs-count">${findings.length}</span></h4>
+      <ul>${findings.map((finding) => `
+        <li class="comparison-finding ${kind}">
+          <span class="finding-severity">${escapeHtml(finding.severity || "?")}</span>
+          <span>${escapeHtml(finding.title || "Untitled finding")}</span>
+        </li>`).join("")}</ul>
+    </div>`;
+  }
+
+  function renderComparisonMessage(message) {
+    const panel = $("#comparison-panel");
+    panel.innerHTML = `
+      <div class="comparison-head">
+        <span class="comparison-label">COMPARISON</span>
+        <button type="button" class="comparison-close" aria-label="Dismiss comparison">×</button>
+      </div>
+      <p class="comparison-error">${escapeHtml(message)}</p>`;
+    panel.querySelector(".comparison-close").addEventListener("click", () => panel.classList.add("hidden"));
+    panel.classList.remove("hidden");
+    panel.focus({ preventScroll: true });
+    scrollToElement(panel, "center");
   }
 
   // ─── Example report ───────────────────────────────────────────────
@@ -729,6 +885,7 @@
     input.value = "";
     if (authConfirm) authConfirm.checked = false;
     updateScanAvailability();
+    renderRecentScans();
     input.focus();
     scrollTo({ top: 0, behavior: scrollBehavior() });
   }
@@ -753,7 +910,10 @@
 
   // ─── Hash restoration + history ───────────────────────────────────
 
-  const REPORT_ID_SHAPE = /^[A-Za-z0-9_-]{16}$/;
+  // Returning visitors land on their browser-local scan list even when the
+  // URL carries no report hash.
+  renderRecentScans();
+
   const initialId = location.hash.slice(1);
   // Report IDs are exactly 16 URL-safe characters server-side. Requiring the
   // same shape here stops nav anchors like #status from triggering a doomed
