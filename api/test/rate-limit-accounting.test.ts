@@ -61,6 +61,48 @@ describe("quota accounting boundaries", () => {
     });
     expect(prepare).not.toHaveBeenCalled();
   });
+
+  it("carries machine-readable quota state in the 429 body alongside the headers", async () => {
+    // The daily window always closes at the end of the current UTC day.
+    const resetAt = `${new Date().toISOString().slice(0, 10)}T23:59:59.999Z`;
+    const prepare = vi.fn(() => ({
+      bind: () => ({ first: async () => ({ request_count: 51 }) }),
+    }));
+    // The quota check runs after the recent-scan cache lookup, which needs a
+    // CacheStorage stand-in under the plain-node test runtime.
+    vi.stubGlobal("caches", {
+      open: async () => ({
+        match: async () => undefined,
+        put: async () => {},
+      }),
+    });
+    try {
+      const response = await worker.fetch(
+        new Request("https://scan.illek.ie/api/v2/scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: "https://example.com" }),
+        }),
+        envWithDb(prepare),
+        ctx,
+      );
+
+      expect(response.status).toBe(429);
+      await expect(response.json()).resolves.toEqual({
+        error: "Daily scan limit of 50 reached.",
+        limit: 50,
+        remaining: 0,
+        resetAt,
+      });
+      expect(response.headers.get("RateLimit-Limit")).toBe("50");
+      // Both countdown headers agree on the seconds remaining in the window.
+      const reset = Number(response.headers.get("RateLimit-Reset"));
+      expect(response.headers.get("Retry-After")).toBe(String(reset));
+      expect(reset).toBeGreaterThan(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
 
 describe("quota scope selection", () => {

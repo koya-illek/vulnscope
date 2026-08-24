@@ -210,6 +210,14 @@ components:
       additionalProperties: true
       properties:
         error: { type: string }
+    RateLimitError:
+      type: object
+      required: [error, limit, remaining, resetAt]
+      properties:
+        error: { type: string }
+        limit: { type: integer, minimum: 1, description: Daily allowance for this caller class. }
+        remaining: { type: integer, minimum: 0, description: Requests left in the current daily window. }
+        resetAt: { type: string, format: date-time, description: End of the current daily window (UTC). }
   responses:
     BadRequest:
       description: Invalid JSON, URL, or options
@@ -218,6 +226,11 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
     RateLimited:
       description: Request limit reached
+      headers:
+        RateLimit-Limit: { schema: { type: integer }, description: Daily allowance for this caller class. }
+        RateLimit-Remaining: { schema: { type: integer }, description: Always 0 once the limit is reached. }
+        RateLimit-Reset: { schema: { type: integer }, description: Seconds until the daily window resets. }
+        Retry-After: { schema: { type: integer }, description: Seconds to wait before retrying. }
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/Error' }
+          schema: { $ref: '#/components/schemas/RateLimitError' }

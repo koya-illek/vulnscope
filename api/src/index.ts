@@ -646,17 +646,25 @@ function normalizeError(error: unknown): { status: number; message: string } {
 
 function errorResponse(error: unknown, cors: Record<string, string>): Response {
   const normalized = normalizeError(error);
-  const rateHeaders: Record<string, string> = error instanceof RateLimitError
-    ? {
-        "RateLimit-Limit": String(error.limit),
-        "RateLimit-Remaining": "0",
-        "RateLimit-Reset": String(Math.max(0, Math.ceil((Date.parse(error.resetAt) - Date.now()) / 1000))),
-        "Retry-After": String(Math.max(1, Math.ceil((Date.parse(error.resetAt) - Date.now()) / 1000))),
-      }
-    : {};
+  if (error instanceof RateLimitError) {
+    // Agents need the quota state in the payload, not only in headers they
+    // may not inspect, so the 429 body carries the same numbers.
+    const retrySeconds = Math.max(1, Math.ceil((Date.parse(error.resetAt) - Date.now()) / 1000));
+    return json({
+      error: normalized.message,
+      limit: error.limit,
+      remaining: Math.max(0, error.limit - error.count),
+      resetAt: error.resetAt,
+    }, normalized.status, {
+      ...cors,
+      "RateLimit-Limit": String(error.limit),
+      "RateLimit-Remaining": "0",
+      "RateLimit-Reset": String(Math.max(0, Math.ceil((Date.parse(error.resetAt) - Date.now()) / 1000))),
+      "Retry-After": String(retrySeconds),
+    });
+  }
   return json({ error: normalized.message }, normalized.status, {
     ...cors,
-    ...rateHeaders,
   });
 }
 
