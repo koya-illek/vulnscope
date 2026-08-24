@@ -4,9 +4,10 @@
   const API_BASE = (window.VULN_SCANNER_CONFIG?.API_BASE || "").replace(/\/$/, "");
   const reportView = window.VulnScopeReport;
   const streamReader = window.VulnScopeStream;
+  const exampleReportModule = window.VulnScopeExample;
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
-  const state = { report: null, progressStep: 0, activeFilter: "all" };
+  const state = { report: null, progressStep: 0, activeFilter: "all", isExample: false };
   // One scan or report load owns the UI at a time; runToken invalidates
   // completions of runs abandoned via "New scan", Cancel, or Back navigation,
   // and activeAbort tears down their in-flight requests.
@@ -76,6 +77,7 @@
   });
   $("#new-scan").addEventListener("click", () => reset());
   $("#cancel-scan").addEventListener("click", () => reset());
+  $("#example-link").addEventListener("click", () => showExample());
   $("#error-close").addEventListener("click", () => {
     errorPanel.classList.add("hidden");
     input.focus();
@@ -98,15 +100,19 @@
     methodDialog.showModal();
   }
 
+  function setActiveFilter(name) {
+    $$(".filter").forEach((item) => {
+      const active = item.dataset.filter === name;
+      item.classList.toggle("active", active);
+      item.setAttribute("aria-pressed", String(active));
+    });
+    state.activeFilter = name;
+  }
+
   $$(".filter").forEach((button) => {
     button.setAttribute("aria-pressed", String(button.classList.contains("active")));
     button.addEventListener("click", () => {
-      $$(".filter").forEach((item) => {
-        const active = item === button;
-        item.classList.toggle("active", active);
-        item.setAttribute("aria-pressed", String(active));
-      });
-      state.activeFilter = button.dataset.filter;
+      setActiveFilter(button.dataset.filter);
       renderFindings(state.report?.findings || []);
     });
   });
@@ -300,16 +306,26 @@
 
   // ─── Report rendering ─────────────────────────────────────────────
 
-  function displayReport(report, updateLocation) {
+  function displayReport(report, updateLocation, { example = false } = {}) {
     state.report = report;
+    state.isExample = example;
     $("#report-host").textContent = report.hostname;
+    // Sample reports point at the reserved .example domain; a dead link to a
+    // non-resolving host teaches nothing, so only real reports become live.
+    if (example) {
+      $("#example-badge").classList.remove("hidden");
+      ["#copy-link", "#export-json", "#new-scan"].forEach((selector) => $(selector).classList.add("hidden"));
+    } else {
+      $("#example-badge").classList.add("hidden");
+      ["#copy-link", "#export-json", "#new-scan"].forEach((selector) => $(selector).classList.remove("hidden"));
+    }
     const requestedUrl = report.requestedUrl || report.url || `https://${report.hostname}`;
     const targetLink = $("#report-url");
     targetLink.textContent = requestedUrl;
     targetLink.title = requestedUrl;
     // Stored URLs are redacted but legacy migrated rows skip per-field
     // validation, so only well-formed http(s) targets become live links.
-    if (/^https?:\/\//i.test(requestedUrl)) {
+    if (!example && /^https?:\/\//i.test(requestedUrl)) {
       targetLink.href = requestedUrl;
     } else {
       targetLink.removeAttribute("href");
@@ -320,7 +336,7 @@
     const budget = outbound
       ? ` · ${outbound.requestsAttempted}/${outbound.maxSubrequests} outbound requests · ${outbound.bodyBytes || 0} bytes${outbound.truncatedBodies ? ` · ${outbound.truncatedBodies} body limit${outbound.truncatedBodies === 1 ? "" : "s"}` : ""}`
       : "";
-    $("#report-meta").textContent = `Report ${report.id || "unknown"} · ${report.status || "unknown"} · created ${created} · expires ${expires}${budget}`;
+    $("#report-meta").textContent = `${example ? "Sample data · " : ""}Report ${report.id || "unknown"} · ${report.status || "unknown"} · created ${created} · expires ${expires}${budget}`;
 
     renderGrade(report.summary || {});
     renderMetrics(report.summary || {});
@@ -342,13 +358,26 @@
 
     reportPanel.classList.remove("hidden");
     if (updateLocation) history.pushState({ reportId: report.id }, "", `#${report.id}`);
-    document.title = `${report.hostname}: VulnScope`;
+    document.title = example ? "Example report: VulnScope" : `${report.hostname}: VulnScope`;
     setTimeout(() => {
       scrollToElement(reportPanel, "start");
       // The view swap is announced by the live regions, but keyboard and
       // screen-reader focus still needs to land on the new context.
       $("#report-host").focus({ preventScroll: true });
     }, 280);
+  }
+
+  // ─── Example report ───────────────────────────────────────────────
+
+  // Renders the bundled sample through the same path as a real scan so the
+  // preview can never drift from the product. Deep-linkable as #example.
+  function showExample() {
+    if (busy) return;
+    setActiveFilter("all");
+    errorPanel.classList.add("hidden");
+    stopProgress();
+    displayReport(exampleReportModule.report(), false, { example: true });
+    if (location.hash !== "#example") history.pushState({ example: true }, "", "#example");
   }
 
   function renderGrade(summary) {
@@ -628,12 +657,9 @@
     activeAbort = null;
     busy = false;
     state.report = null;
+    state.isExample = false;
     state.activeFilter = "all";
-    $$(".filter").forEach((item) => {
-      const active = item.dataset.filter === "all";
-      item.classList.toggle("active", active);
-      item.setAttribute("aria-pressed", String(active));
-    });
+    setActiveFilter("all");
     reportPanel.classList.add("hidden");
     errorPanel.classList.add("hidden");
     stopProgress();
@@ -674,10 +700,15 @@
   // Report IDs are exactly 16 URL-safe characters server-side. Requiring the
   // same shape here stops nav anchors like #status from triggering a doomed
   // report fetch and a spurious error panel.
-  if (REPORT_ID_SHAPE.test(initialId)) loadReport(initialId);
+  if (initialId === "example") showExample();
+  else if (REPORT_ID_SHAPE.test(initialId)) loadReport(initialId);
 
   window.addEventListener("popstate", () => {
     const id = location.hash.slice(1);
+    if (id === "example") {
+      if (!busy && !state.isExample) showExample();
+      return;
+    }
     if (REPORT_ID_SHAPE.test(id)) {
       if (!busy && state.report?.id !== id) loadReport(id);
       return;
