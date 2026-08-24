@@ -54,7 +54,7 @@ flowchart LR
 
 | Component | Responsibility | Primary source |
 | --- | --- | --- |
-| Worker router | Serves assets, validates API and MCP requests, applies rate controls, creates and retrieves reports, exports JSON, and runs cleanup | `api/src/index.ts` |
+| Worker router | Serves assets, validates API and MCP requests, applies rate controls, creates and retrieves reports, exports JSON and Markdown, and runs cleanup | `api/src/index.ts` |
 | Safe outbound layer | Enforces schemes, ports, public DNS, host boundaries, redirect checks, request limits, concurrency, time, and body reservations | `api/src/outbound.ts`, `api/src/security.ts` |
 | Analyzer | Orchestrates the initial fetch and all enabled phases, normalizes phase status, and builds the report | `api/src/analyzer.ts` |
 | DNS engine | Uses independent DNS-over-HTTPS providers and preserves resolver states | `api/src/dns.ts` |
@@ -102,7 +102,7 @@ When a budget is exhausted, the remaining work is marked partial or skipped. The
 | `POST /api/v2/scan` | Complete synchronous scan |
 | `POST /api/scans/stream` | NDJSON progress and final report |
 | `GET /api/scans/{reportId}` | Retrieve an unexpired report |
-| `GET /api/scans/{reportId}/export` | Download formatted report JSON |
+| `GET /api/scans/{reportId}/export` | Download the report as JSON or Markdown (`?format=markdown`) |
 | `POST /mcp` and `POST /mcp/v2` | Stateless MCP over JSON-RPC HTTP |
 | `/openapi.yaml` | REST and result schemas |
 | `/mcp-copilot.yaml` | Copilot Studio MCP connector metadata |

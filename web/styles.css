@@ -231,8 +231,8 @@ input:focus-visible,
   letter-spacing: .15em;
 }
 .hero-route i { width: 30px; height: 1px; background: #2c4037; }
-.example-hint { margin: 22px 0 0; color: var(--muted); font-size: 13px; }
-.example-link { min-height: 0; padding: 2px 4px; color: var(--accent); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+.example-hint { margin: 22px 0 64px; color: var(--muted); font-size: 13px; }
+.example-link { min-height: 44px; padding: 10px 6px; color: var(--accent); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
 .example-link:hover { color: var(--accent-2); }
 
 /* Progress panel */

@@ -676,7 +676,6 @@
     busy = false;
     state.report = null;
     state.isExample = false;
-    state.activeFilter = "all";
     setActiveFilter("all");
     reportPanel.classList.add("hidden");
     errorPanel.classList.add("hidden");
