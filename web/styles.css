@@ -789,7 +789,7 @@ dialog h2 { margin: 0 0 30px; font-size: 32px; letter-spacing: -.04em; }
   .error-panel, .principles, .developer-access, footer, dialog,
   .report-actions, .filter-set { display: none !important; }
   main { width: 100%; }
-  .report { border: 0; padding: 0; box-shadow: none; }
+  .report { padding: 0; }
   a { text-decoration: none; color: inherit; }
   .finding-card, .detail-row, .header-audit-row, .cookie-row,
   .path-row, .cors-row, .takeover-row, .grade-section, .panel-header { break-inside: avoid; }
