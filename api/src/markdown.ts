@@ -1,4 +1,5 @@
 import type { Finding, ScanReport } from "./types";
+import { WEBSITE_ORIGIN } from "./version";
 
 const SEVERITY_ORDER: Finding["severity"][] = ["critical", "high", "medium", "low", "info"];
 
@@ -16,6 +17,9 @@ export function reportToMarkdown(report: ScanReport): string {
   lines.push(`- Status: ${report.status}`);
   lines.push(`- Target: ${report.requestedUrl}`);
   lines.push(`- Report ID: \`${report.id}\``);
+  // A Markdown handoff leaves the browser chrome behind just like a printout;
+  // carry the live bearer link so the document can reach its own source.
+  lines.push(`- Report link: ${WEBSITE_ORIGIN}/#${report.id}`);
   lines.push(`- Created: ${report.createdAt}`);
   lines.push(`- Expires: ${report.expiresAt}`);
   lines.push(`- Duration: ${(report.totalDurationMs / 1000).toFixed(1)}s`);
