@@ -694,6 +694,17 @@ function corsHeaders(origin: string | null): Record<string, string> {
     ...(origin ? { "Access-Control-Allow-Origin": origin, Vary: "Origin" } : {}),
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, MCP-Protocol-Version, MCP-Session-Id",
+    // Cross-origin browser agents are first-class callers, but without this
+    // list they cannot read the validators and quota state this API emits
+    // (fetch() hides response headers not named here).
+    "Access-Control-Expose-Headers": [
+      "ETag",
+      "MCP-Protocol-Version",
+      "RateLimit-Limit",
+      "RateLimit-Remaining",
+      "RateLimit-Reset",
+      "Retry-After",
+    ].join(", "),
     "Access-Control-Max-Age": "86400",
   };
 }

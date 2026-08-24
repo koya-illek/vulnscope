@@ -289,4 +289,22 @@ describe("static and discovery surfaces", () => {
     expect(rejected.status).toBe(403);
     expect(rejected.headers.get("access-control-allow-origin")).toBeNull();
   });
+
+  it("exposes validators and quota headers to allowlisted cross-origin readers", async () => {
+    // fetch() hides response headers from cross-origin callers unless they
+    // are named in Access-Control-Expose-Headers; ETag revalidation and
+    // quota state are useless to a browser agent without them.
+    const response = await worker.fetch(
+      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop", {
+        headers: { Origin: "https://scan.illek.ie" },
+      }),
+      { ...envWithRow({ report_json: storedReportJson("example.com") }), ALLOWED_ORIGINS: "https://scan.illek.ie" } as Env,
+      ctx,
+    );
+    expect(response.status).toBe(200);
+    const exposed = (response.headers.get("access-control-expose-headers") || "").split(",").map((item) => item.trim());
+    for (const header of ["ETag", "RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset", "Retry-After"]) {
+      expect(exposed).toContain(header);
+    }
+  });
 });
