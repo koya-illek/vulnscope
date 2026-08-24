@@ -47,6 +47,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { description: 'Target is disallowed, non-public, or failed SSRF validation' }
         '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /api/scans/stream:
     post:
       operationId: streamWebsiteScan
@@ -65,6 +66,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { description: 'Target is disallowed, non-public, or failed SSRF validation' }
         '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /api/scans/{reportId}:
     get:
       operationId: getVulnScopeReport
@@ -238,6 +240,11 @@ components:
       description: The stored representation still matches the supplied If-None-Match validator; the body is empty.
       headers:
         ETag: { schema: { type: string }, description: The validator that satisfied the conditional request. }
+    ServiceUnavailable:
+      description: Both public DNS resolvers were unavailable, so the target could not be checked. The request is refunded and may be retried.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     RateLimited:
       description: Request limit reached
       headers:
