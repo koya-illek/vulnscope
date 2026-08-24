@@ -77,11 +77,23 @@ paths:
   /api/scans/{reportId}/export:
     get:
       operationId: exportVulnScopeReport
-      summary: Download an unexpired scan report as formatted JSON
+      summary: Download an unexpired scan report as formatted JSON or Markdown
       parameters:
         - { name: reportId, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{16}$' } }
+        - name: format
+          in: query
+          required: false
+          schema: { type: string, enum: [json, markdown], default: json }
+          description: 'json returns a formatted .json attachment; markdown returns a human-readable .md document suitable for tickets and review docs.'
       responses:
-        '200': { description: JSON report attachment, content: { application/json: { schema: { $ref: '#/components/schemas/ScanReport' } } } }
+        '200':
+          description: Report attachment in the requested format
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScanReport' }
+            text/markdown:
+              schema: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { description: Report not found or expired }
 components:
   schemas:

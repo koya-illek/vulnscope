@@ -2,6 +2,7 @@ import type { ScanReport } from "./types";
 import { BlockedTargetError, InputError, RateLimitError, ResolverUnavailableError } from "./security";
 import { OutboundPolicyError } from "./outbound";
 import { decodeUtf8, readBoundedRequestBody, RequestBodyError } from "./http-body";
+import { reportToMarkdown } from "./markdown";
 
 import { VERSION } from "./version";
 
@@ -90,8 +91,11 @@ export async function handleMcp(
   if (!["scan_website", "get_vulnscope_report"].includes(String(params.name))) return rpcError(id, -32602, "Unknown tool name");
   const args = params.arguments && typeof params.arguments === "object" ? params.arguments as Record<string, unknown> : {};
   if (params.name === "get_vulnscope_report") {
-    if (Object.keys(args).some((key) => key !== "reportId")) return rpcError(id, -32602, "get_vulnscope_report received an unsupported argument");
+    if (Object.keys(args).some((key) => key !== "reportId" && key !== "format")) return rpcError(id, -32602, "get_vulnscope_report received an unsupported argument");
     if (typeof args.reportId !== "string") return rpcError(id, -32602, "get_vulnscope_report requires reportId");
+    if (args.format !== undefined && args.format !== "json" && args.format !== "markdown") {
+      return rpcError(id, -32602, "format must be \"json\" or \"markdown\"");
+    }
   } else {
     const scanKeys = new Set(["url", "probePaths", "checkTakeover"]);
     if (Object.keys(args).some((key) => !scanKeys.has(key))) return rpcError(id, -32602, "scan_website received an unsupported argument");
@@ -102,8 +106,14 @@ export async function handleMcp(
 
   try {
     const report = await execute(String(params.name), args);
+    // Markdown keeps the structured JSON in structuredContent for schema
+    // validating clients and swaps the human-readable text content, so both
+    // audiences get their preferred rendering of the same report.
+    const text = params.name === "get_vulnscope_report" && args.format === "markdown"
+      ? reportToMarkdown(report)
+      : JSON.stringify(report);
     return rpcResult(id, {
-      content: [{ type: "text", text: JSON.stringify(report) }],
+      content: [{ type: "text", text }],
       structuredContent: report,
       isError: false,
     });
@@ -117,7 +127,7 @@ function reportTool() {
   return {
     name: "get_vulnscope_report", title: "Retrieve a VulnScope report",
     description: "Retrieve a previously created, unexpired VulnScope report by its 16-character report ID, including coverage, evidence, findings, and recommendations.",
-    inputSchema: { type: "object", additionalProperties: false, required: ["reportId"], properties: { reportId: { type: "string", pattern: "^[A-Za-z0-9_-]{16}$" } } },
+    inputSchema: { type: "object", additionalProperties: false, required: ["reportId"], properties: { reportId: { type: "string", pattern: "^[A-Za-z0-9_-]{16}$" }, format: { type: "string", enum: ["json", "markdown"], default: "json", description: "Return the report as machine-readable JSON or human-readable Markdown for tickets and review docs." } } },
     outputSchema: scanOutputSchema(),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   };

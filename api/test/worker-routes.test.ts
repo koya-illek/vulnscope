@@ -89,6 +89,30 @@ describe("report export contract", () => {
     await expect(response.json()).resolves.toEqual({ error: "Report not found or expired" });
   });
 
+  it("serves ?format=markdown as a text/markdown attachment", async () => {
+    const response = await worker.fetch(
+      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop/export?format=markdown"),
+      envWithRow({ report_json: storedReportJson("example.com") }),
+      ctx,
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/markdown");
+    const disposition = response.headers.get("content-disposition") || "";
+    expect(disposition).toMatch(/^attachment; filename="vulnscope-example\.com-abcdefghijklmnop\.md"$/);
+    const body = await response.text();
+    expect(body).toContain("# VulnScope report: example.com");
+  });
+
+  it("rejects unknown export formats instead of silently returning JSON", async () => {
+    const response = await worker.fetch(
+      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop/export?format=pdf"),
+      envWithRow({ report_json: storedReportJson("example.com") }),
+      ctx,
+    );
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Unsupported export format." });
+  });
+
   it("treats HEAD on a report route like GET instead of a JSON 404 miss", async () => {
     const response = await worker.fetch(
       new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop", { method: "HEAD" }),

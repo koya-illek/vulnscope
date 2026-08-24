@@ -16,6 +16,43 @@ const report = {
   summary: { grade: "A", critical: 0, high: 0, medium: 0, low: 0, info: 0 },
 } as unknown as ScanReport;
 
+// Complete enough for every renderer the tool result passes through.
+function fullReport(): ScanReport {
+  return {
+    ...report,
+    observation: { vantage: "cloudflare-edge", disclaimer: "Observations are from the Cloudflare edge." },
+    outbound: {
+      maxSubrequests: 46, maxConcurrent: 6, maxDurationMs: 25_000,
+      requestsAttempted: 3, requestsSucceeded: 3, requestsFailed: 0, requestsSkipped: 0,
+      activePeak: 1, bodyBytes: 1_024, truncatedBodies: 0, redirects: [],
+    },
+    coverage: {
+      mainFetch: { status: "measured", detail: "GET response received with HTTP 200." },
+      headers: { status: "measured", detail: "Audited." },
+      tlsProtocolCipher: { status: "unavailable", detail: "Not assessed." },
+      certificateEvidence: { status: "unavailable", detail: "No CT evidence." },
+      dns: { status: "measured", detail: "Confirmed addresses." },
+      cookies: { status: "skipped", detail: "No response.", requested: true },
+      paths: { status: "skipped", detail: "Not enabled.", requested: false },
+      cors: { status: "measured", detail: "Probes completed." },
+      secrets: { status: "skipped", detail: "Not enabled.", requested: false },
+      wordpress: { status: "skipped", detail: "Not WordPress.", requested: false },
+      methods: { status: "measured", detail: "Reconnaissance completed." },
+      takeover: { status: "skipped", detail: "Not enabled.", requested: false },
+      criticalGaps: [],
+    },
+    findings: [{
+      id: "missing-header-hsts",
+      severity: "high",
+      category: "missing-header",
+      title: "Strict-Transport-Security missing",
+      detail: "Browsers are not told to enforce HTTPS.",
+      evidence: "No Strict-Transport-Security header on GET /",
+      recommendation: "Send Strict-Transport-Security.",
+    }],
+  } as unknown as ScanReport;
+}
+
 function rpc(method: string, params: unknown = {}, id: number | undefined = 1): Request {
   return new Request("https://scan.illek.ie/mcp/v2", {
     method: "POST",
@@ -78,6 +115,29 @@ describe("VulnScope MCP", () => {
       code: -32602,
       message: "scan_website received an unsupported argument",
     });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("renders get_vulnscope_report text content as Markdown when requested", async () => {
+    const response = await handleMcp(rpc("tools/call", {
+      name: "get_vulnscope_report",
+      arguments: { reportId: "abcdefghijklmnop", format: "markdown" },
+    }), async () => fullReport());
+    const body = await response.json<{ result: { content: Array<{ text: string }>; structuredContent: ScanReport; isError: boolean } }>();
+    expect(body.result.isError).toBe(false);
+    expect(body.result.content[0].text).toContain("# VulnScope report: example.com");
+    // The schema-validating audience still receives the JSON report.
+    expect(body.result.structuredContent.id).toBe("abcdefghijklmnop");
+  });
+
+  it("rejects an unsupported report format before executing the tool", async () => {
+    const execute = vi.fn(async () => report);
+    const response = await handleMcp(rpc("tools/call", {
+      name: "get_vulnscope_report",
+      arguments: { reportId: "abcdefghijklmnop", format: "pdf" },
+    }), execute);
+    const body = await response.json<{ error: { code: number; message: string } }>();
+    expect(body.error).toEqual({ code: -32602, message: "format must be \"json\" or \"markdown\"" });
     expect(execute).not.toHaveBeenCalled();
   });
 

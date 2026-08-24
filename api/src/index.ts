@@ -13,6 +13,7 @@ import type { CoverageStatus, Env, Finding, OutboundRequestSummary, ScanCoverage
 import { handleMcp } from "./mcp";
 import { deriveDailyQuotaKey } from "./quota";
 import { decodeUtf8, readBoundedRequestBody, RequestBodyError } from "./http-body";
+import { reportToMarkdown } from "./markdown";
 import { VERSION, WEBSITE_ORIGIN } from "./version";
 
 const API_VERSION = VERSION;
@@ -155,9 +156,24 @@ export default {
         const report = await loadReport(env.DB, match[1]);
         if (!report) return json({ error: "Report not found or expired" }, 404, cors);
         if (match[2]) {
+          const format = url.searchParams.get("format");
+          if (format && !["json", "markdown", "md"].includes(format)) {
+            return json({ error: "Unsupported export format." }, 400, cors);
+          }
           // Stored fields are trusted in aggregate but not per-field on
           // migrated or corrupted rows; never let them steer header syntax.
           const fileSlug = (value: string) => value.replace(/[^A-Za-z0-9.-]+/g, "-").replace(/^-+|-+$/g, "") || "report";
+          if (format && format !== "json") {
+            return new Response(reportToMarkdown(report), {
+              headers: {
+                ...cors,
+                "Content-Type": "text/markdown; charset=utf-8",
+                "Content-Disposition": `attachment; filename="vulnscope-${fileSlug(report.hostname)}-${fileSlug(report.id)}.md"`,
+                "Cache-Control": "private, no-store",
+                ...securityHeaders(),
+              },
+            });
+          }
           return new Response(JSON.stringify(report, null, 2), {
             headers: {
               ...cors,

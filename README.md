@@ -58,6 +58,8 @@ curl -sS -X POST https://scan.illek.ie/api/scans/stream \
 # Read or export an unexpired report by its 16-character ID
 curl -sS https://scan.illek.ie/api/scans/<reportId>
 curl -sSOJ https://scan.illek.ie/api/scans/<reportId>/export
+# The same export as a Markdown document for tickets and review docs
+curl -sSOJ "https://scan.illek.ie/api/scans/<reportId>/export?format=markdown"
 
 # MCP: initialize, then call a tool (stateless; no session handshake needed)
 curl -sS -X POST https://scan.illek.ie/mcp/v2 \
