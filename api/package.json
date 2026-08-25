@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "npm run typecheck && npm test && npm run check:web && npm run check:openapi",
+    "check": "npm run typecheck && npm test && npm run check:web && npm run check:browser && npm run check:openapi",
+    "check:browser": "node scripts/browser-example-check.mjs",
     "check:openapi": "redocly lint ../web/openapi.yaml ../web/mcp-copilot.yaml",
     "check:web": "node --check ../web/app.js && node --check ../web/report-view.js && node --check ../web/stream-reader.js && node --check ../web/example-report.js && node --check ../web/scan-history.js",
     "dev": "wrangler dev",
