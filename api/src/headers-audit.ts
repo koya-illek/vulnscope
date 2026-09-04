@@ -168,12 +168,6 @@ export function auditHeaders(headers: Headers): { result: HeaderAuditResult; fin
     value: xssPresent ? rawXss : null,
   };
 
-  if (!xssPresent) {
-    findings.push(makeFinding("missing-header", "info", "X-XSS-Protection Not Set (Deprecated)",
-      "X-XSS-Protection is deprecated and superseded by CSP. Flagged for awareness only.",
-      "X-XSS-Protection header is absent.",
-      "No action needed if CSP is properly configured. This header is deprecated."));
-  }
 
   // --- Server header reveals version ---
   const rawServer = redactHeaderValue("server", headers.get("server") || "");

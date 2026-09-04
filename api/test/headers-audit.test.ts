@@ -19,12 +19,13 @@ describe("auditHeaders", () => {
 
     // Should flag missing HSTS (high), missing CSP (high), missing X-Content-Type-Options (medium),
     // missing clickjacking protection (medium), missing Referrer-Policy (low),
-    // missing Permissions-Policy (low), missing X-XSS-Protection (info)
+    // missing Permissions-Policy (low). Deprecated headers need no remediation.
     const severities = findings.map((f) => f.severity);
     expect(severities).toContain("high");
     expect(severities).toContain("medium");
     expect(severities).toContain("low");
-    expect(severities).toContain("info");
+    expect(result.xXssProtection.present).toBe(false);
+    expect(findings.some(f => f.title.includes("X-XSS-Protection"))).toBe(false);
   });
 
   it("passes with all security headers properly configured", () => {

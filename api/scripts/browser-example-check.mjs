@@ -255,6 +255,7 @@ async function main() {
     await devtools.send("Page.enable");
     await devtools.send("Runtime.enable");
     await devtools.send("Log.enable");
+    await devtools.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
     devtools.on("Runtime.exceptionThrown", (params) => uncaught.push(describeException(params.exceptionDetails)));
     devtools.on("Log.entryAdded", (params) => {
       if (params.entry.level === "error") consoleErrors.push(`${params.entry.text} (${params.entry.source}${params.entry.url ? ` ${params.entry.url}` : ""})`);
@@ -284,6 +285,7 @@ async function main() {
           exampleBadgeVisible: visible("#example-badge"),
           reportHost: document.querySelector("#report-host")?.textContent ?? null,
           findingCount: findings ? findings.childElementCount : -1,
+          findingWidths: [...document.querySelectorAll(".finding-body")].map(node => node.getBoundingClientRect().width),
           title: document.title,
         };
       })()`,
@@ -297,6 +299,7 @@ async function main() {
     if (!state.exampleBadgeVisible) problems.push("#example-badge stayed hidden; the SAMPLE DATA marker did not render.");
     if (state.reportHost !== "shop.example") problems.push(`#report-host was ${JSON.stringify(state.reportHost)}, expected "shop.example".`);
     if (!(state.findingCount > 0)) problems.push(`#findings-list rendered ${state.findingCount} sections, expected at least one.`);
+    if (state.findingWidths.some(width => width < 200)) problems.push("Mobile finding text has less than 200px of readable width.");
     if (state.title !== "Example report: VulnScope") problems.push(`document.title was ${JSON.stringify(state.title)}, expected "Example report: VulnScope".`);
     for (const exception of uncaught) problems.push(`Uncaught page exception: ${exception}`);
     for (const error of consoleErrors) problems.push(`Console error: ${error}`);

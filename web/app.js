@@ -419,6 +419,10 @@
     $("#report-share-url").textContent = example ? "" : `${location.origin}${location.pathname}#${report.id}`;
 
     renderGrade(report.summary || {});
+    const omissions = Object.entries(report.coverage || {})
+      .filter(([, phase]) => phase && ["unavailable", "skipped", "failed", "partial"].includes(phase.status))
+      .map(([name, phase]) => `${({ tlsProtocolCipher: "Active TLS", certificateEvidence: "Certificate history", paths: "Sensitive paths", takeover: "Subdomain takeover", wordpress: "WordPress" })[name] || name}: ${phase.status}`);
+    $("#grade-coverage").textContent = `This grade covers observed HTTP evidence. ${omissions.join(". ")}${omissions.length ? "." : ""} It does not certify site security.`;
     renderMetrics(report.summary || {});
     renderFindings(report.findings || []);
     renderDnsSsl(report);
