@@ -155,17 +155,11 @@
           <h2 id="report-host" tabindex="-1">example.com</h2>
           <span class="example-badge hidden" id="example-badge">SAMPLE DATA</span>
           <a id="report-url" href="#" target="_blank" rel="noopener noreferrer"></a>
-          <p class="report-meta" id="report-meta" aria-live="polite"></p>
-          <p class="report-privacy-warning">Anyone with this link can view the report until it expires. Share it only with approved reviewers.</p>
+          <details class="report-observation"><summary>Scan information</summary><p class="report-meta" id="report-meta"></p></details>
+
           <p class="report-share-url" id="report-share-url"></p>
         </div>
-        <div class="report-actions">
-          <button class="secondary-button" id="copy-link" type="button">Copy share link</button>
-          <button class="secondary-button" id="export-json" type="button">Export JSON</button>
-          <button class="secondary-button" id="export-markdown" type="button">Export Markdown</button>
-          <button class="secondary-button hidden" id="compare-previous" type="button">Compare with previous</button>
-          <button class="icon-button" id="new-scan" type="button" aria-label="Start a new scan">+</button>
-        </div>
+
       </header>
 
       <section class="comparison-panel hidden" id="comparison-panel" tabindex="-1"></section>
@@ -196,28 +190,39 @@
       <p class="visually-hidden" role="status" id="findings-status"></p>
       <div class="findings-list" id="findings-list"></div>
 
+        <div class="report-actions">
+          <button class="secondary-button" id="copy-link" type="button">Share report</button>
+          <details class="export-menu"><summary>Export report</summary><div class="export-options">
+          <button class="secondary-button" id="export-json" type="button">Export JSON</button>
+          <button class="secondary-button" id="export-markdown" type="button">Export Markdown</button>
+          </div></details>
+          <button class="secondary-button hidden" id="compare-previous" type="button">Compare with previous</button>
+          <button class="secondary-button" id="new-scan" type="button" aria-label="Start a new scan">New scan</button>
+        </div>
+          <p class="report-privacy-warning">Anyone with this link can view the report until it expires. Share it only with approved reviewers.</p>
+
       <section class="panel details-panel">
         <div class="panel-header">
           <div><span class="section-number">02</span><h3>Scan details</h3></div>
           <span class="evidence-badge">EVIDENCE-BACKED</span>
         </div>
 
-        <details class="collapsible-section" open>
-          <summary><span class="cs-icon">DNS</span> DNS &amp; SSL details</summary>
+        <details class="collapsible-section">
+          <summary><span class="cs-icon">DNS</span> DNS and certificate history</summary>
           <div class="cs-body" id="dns-ssl-details"></div>
         </details>
 
-        <details class="collapsible-section" open>
+        <details class="collapsible-section">
           <summary><span class="cs-icon">COV</span> Scan coverage</summary>
           <div class="cs-body" id="coverage-details"></div>
         </details>
 
-        <details class="collapsible-section" open>
+        <details class="collapsible-section">
           <summary><span class="cs-icon">HDR</span> Security headers audit</summary>
           <div class="cs-body" id="headers-audit"></div>
         </details>
 
-        <details class="collapsible-section" open>
+        <details class="collapsible-section">
           <summary><span class="cs-icon">FNG</span> Technology fingerprint</summary>
           <div class="cs-body" id="fingerprint-details"></div>
         </details>
@@ -227,12 +232,12 @@
           <div class="cs-body" id="cookie-details"></div>
         </details>
 
-        <details class="collapsible-section" open>
+        <details class="collapsible-section">
           <summary><span class="cs-icon">PTH</span> Exposed paths <span class="cs-count" id="paths-count"></span></summary>
           <div class="cs-body" id="paths-details"></div>
         </details>
 
-        <details class="collapsible-section" open>
+        <details class="collapsible-section">
           <summary><span class="cs-icon">CRS</span> CORS test</summary>
           <div class="cs-body" id="cors-details"></div>
         </details>
@@ -250,25 +255,29 @@
     </section>
 
     <section class="principles" id="status">
+      <details class="supporting-details"><summary>How this tool works</summary>
       <h2 class="visually-hidden">Scanning principles</h2>
       <div class="principle-grid">
         <article><span>01</span><h3>Unauthenticated only</h3><p>Every check runs without credentials, showing what an external attacker can see.</p></article>
         <article><span>02</span><h3>Evidence-backed</h3><p>Each finding includes the observed header, response signature, or request result that supports it.</p></article>
         <article><span>03</span><h3>Bounded checks</h3><p>Request, concurrency, response-body, and time limits constrain each scan. Private targets and non-standard ports are blocked.</p></article>
       </div>
+      </details>
     </section>
 
     <section class="developer-access" aria-labelledby="developer-access-title">
+      <details class="supporting-details"><summary>API and integrations</summary>
       <div>
         <h2 id="developer-access-title">Run authorised scans from your agent or workflow</h2>
         <p>Create bounded public-site scans and retrieve complete evidence-backed reports through REST or JSON MCP.</p>
-        <p class="developer-note">Open for testing. Limited requests. Scan only systems you are authorised to assess.</p>
+        <p class="developer-note">Request limits apply. If you reach a limit, the response tells you when to retry. Scan only systems you are authorised to assess.</p>
       </div>
       <div class="developer-links">
         <a href="./openapi.yaml" type="application/yaml"><strong>REST API</strong><span>OpenAPI contract and examples</span></a>
         <div class="developer-endpoint"><strong>MCP endpoint · 2 tools</strong><code>scan.illek.ie/mcp/v2</code></div>
         <a href="./mcp-copilot.yaml" type="application/yaml"><strong>Copilot connector</strong><span>Import-ready MCP definition</span></a>
       </div>
+      </details>
     </section>
   </main>
 
@@ -286,7 +295,7 @@
     <h2 id="method-dialog-title">What VulnScope scans</h2>
     <p id="method-dialog-description" class="dialog-description">A bounded external observation. No credentials, exploit payloads, form submissions, or destructive methods are used.</p>
     <div class="method-list">
-      <article><span>RECON</span><div><h3>DNS &amp; SSL reconnaissance</h3><p>Resolves DNS records and records certificate-transparency evidence with its limitations. Origin TLS protocol and cipher details are not fabricated when the Worker cannot measure them.</p></div></article>
+      <article><span>RECON</span><div><h3>DNS and certificate history</h3><p>Resolves DNS records and records certificate-transparency evidence with its limitations. Active TLS protocol and cipher testing is not included.</p></div></article>
       <article><span>HDR</span><div><h3>Security header audit</h3><p>Checks for presence and correctness of HSTS, CSP, X-Frame-Options, X-Content-Type-Options, and other security headers.</p></div></article>
       <article><span>PTH</span><div><h3>Sensitive path probing</h3><p>Tests for commonly exposed files: .env, .git/config, backup archives, admin panels, and configuration files.</p></div></article>
       <article><span>FNG</span><div><h3>Technology fingerprinting</h3><p>Identifies server software, CMS, frameworks, and observed languages from response headers, cookies, and HTML markers.</p></div></article>

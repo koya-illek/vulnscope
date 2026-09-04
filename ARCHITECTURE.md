@@ -1,5 +1,12 @@
 # VulnScope architecture
 
+## Interface decisions, 2026-09-05
+
+Completed scans replace the input form and lead with coverage and findings.
+Routine evidence sections start collapsed. Sharing remains beside its privacy
+warning, and export formats share one expandable control. The certificate
+section describes historical evidence, not an active TLS test.
+
 Last reviewed: 2026-08-23
 
 VulnScope is a bounded external-exposure scanner for authorised public websites. It collects non-destructive HTTP, DNS, header, method, CORS, technology, script, WordPress, sensitive-path, certificate-transparency, and takeover evidence, while making coverage and skipped work explicit.
