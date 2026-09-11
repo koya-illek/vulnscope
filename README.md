@@ -4,6 +4,8 @@ VulnScope performs bounded, unauthenticated reconnaissance of authorised
 public websites without exploiting vulnerabilities, submitting forms, or
 bypassing authentication.
 
+Live at [scan.illek.ie](https://scan.illek.ie).
+
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the complete component, data-flow,
 storage, probe-budget, deployment, and third-party service design.
 
@@ -115,3 +117,9 @@ production HTTP→HTTPS entry redirect that would otherwise loop forever under
 the page can call the API same-origin. The example file also supplies a dummy
 `RATE_LIMIT_HMAC_KEY` of at least 32 bytes. Keep the real `api/.dev.vars` file
 gitignored. Production values in `wrangler.toml` are unaffected.
+
+## License
+
+MIT © Koya Illek. See [LICENSE](LICENSE).
+
+Live service: [scan.illek.ie](https://scan.illek.ie).
