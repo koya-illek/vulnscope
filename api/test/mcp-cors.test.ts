@@ -9,7 +9,7 @@ const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as Execut
 
 describe("MCP browser boundary", () => {
   it("returns CORS and security headers to an allowed browser origin", async () => {
-    const response = await worker.fetch(new Request("https://scan.illek.ie/mcp/v2", {
+    const response = await worker.fetch(new Request("https://vulnscope.illek.ie/mcp/v2", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -26,7 +26,7 @@ describe("MCP browser boundary", () => {
   });
 
   it("adds the same policy headers to preflight responses", async () => {
-    const response = await worker.fetch(new Request("https://scan.illek.ie/mcp/v2", {
+    const response = await worker.fetch(new Request("https://vulnscope.illek.ie/mcp/v2", {
       method: "OPTIONS",
       headers: { Origin: "https://client.example" },
     }), env, ctx);

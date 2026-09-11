@@ -70,7 +70,7 @@ describe("report markdown rendering", () => {
     expect(markdown).toContain("- Grade: D");
     expect(markdown).toContain("- Target: https://example.com/");
     expect(markdown).toContain("- Report ID: `abcdefghijklmnop`");
-    expect(markdown).toContain(`- Report link: https://scan.illek.ie/#abcdefghijklmnop`);
+    expect(markdown).toContain(`- Report link: https://vulnscope.illek.ie/#abcdefghijklmnop`);
     expect(markdown).toContain("- Duration: 12.3s");
     expect(markdown).toContain("- Outbound work: 29/46 requests");
     expect(markdown.indexOf("### High:")).toBeGreaterThan(-1);

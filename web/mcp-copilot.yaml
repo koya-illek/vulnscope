@@ -1,11 +1,11 @@
 swagger: '2.0'
 info:
   title: VulnScope MCP
-  description: Run bounded unauthenticated reconnaissance against authorised public websites and retrieve complete stored reports. Full REST and result schemas are at https://scan.illek.ie/openapi.yaml.
+  description: Run bounded unauthenticated reconnaissance against authorised public websites and retrieve complete stored reports. Full REST and result schemas are at https://vulnscope.illek.ie/openapi.yaml.
   version: 2.0.0
   license:
     name: Proprietary
-host: scan.illek.ie
+host: vulnscope.illek.ie
 basePath: /
 schemes: [https]
 security: []

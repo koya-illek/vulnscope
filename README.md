@@ -1,10 +1,14 @@
 # VulnScope
 
+An Illek project.
+
 VulnScope performs bounded, unauthenticated reconnaissance of authorised
 public websites without exploiting vulnerabilities, submitting forms, or
 bypassing authentication.
 
-Live at [scan.illek.ie](https://scan.illek.ie).
+Live at [vulnscope.illek.ie](https://vulnscope.illek.ie).
+[scan.illek.ie](https://scan.illek.ie) permanently redirects to the same
+service.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the complete component, data-flow,
 storage, probe-budget, deployment, and third-party service design.
@@ -48,47 +52,47 @@ deltas, added and resolved findings. That list lives entirely in
 ## Agent integrations
 
 ```text
-GET  https://scan.illek.ie/api/v2
-POST https://scan.illek.ie/api/v2/scan
-POST https://scan.illek.ie/mcp
-POST https://scan.illek.ie/mcp/v2
+GET  https://vulnscope.illek.ie/api/v2
+POST https://vulnscope.illek.ie/api/v2/scan
+POST https://vulnscope.illek.ie/mcp
+POST https://vulnscope.illek.ie/mcp/v2
 ```
 
 The MCP endpoints implement stateless JSON-RPC over HTTP, negotiate
 `2025-11-25` (echoing a client-pinned `2025-06-18` when requested), and
 publish `scan_website` plus `get_vulnscope_report`. REST scan progress uses
 newline-delimited JSON (`application/x-ndjson`). Copilot Studio can import
-`https://scan.illek.ie/mcp-copilot.yaml`; OpenAPI agents can import
-`https://scan.illek.ie/openapi.yaml`.
+`https://vulnscope.illek.ie/mcp-copilot.yaml`; OpenAPI agents can import
+`https://vulnscope.illek.ie/openapi.yaml`.
 
 ### Quickstart
 
 ```sh
 # Create a scan (201 with the full report; charges the daily web quota)
-curl -sS -X POST https://scan.illek.ie/api/v2/scan \
+curl -sS -X POST https://vulnscope.illek.ie/api/v2/scan \
   -H 'Content-Type: application/json' \
   -d '{"url": "example.com", "probePaths": false, "checkTakeover": false, "checkWordPress": false, "probeTrace": false}'
 
 # The same scan with newline-delimited progress events
-curl -sS -X POST https://scan.illek.ie/api/scans/stream \
+curl -sS -X POST https://vulnscope.illek.ie/api/scans/stream \
   -H 'Content-Type: application/json' \
   -d '{"url": "example.com"}'
 
 # Read or export an unexpired report by its 16-character ID
-curl -sS https://scan.illek.ie/api/scans/<reportId>
-curl -sSOJ https://scan.illek.ie/api/scans/<reportId>/export
+curl -sS https://vulnscope.illek.ie/api/scans/<reportId>
+curl -sSOJ https://vulnscope.illek.ie/api/scans/<reportId>/export
 # The same export as a Markdown document for tickets and review docs
-curl -sSOJ "https://scan.illek.ie/api/scans/<reportId>/export?format=markdown"
+curl -sSOJ "https://vulnscope.illek.ie/api/scans/<reportId>/export?format=markdown"
 # Poll without re-downloading: revalidate the ETag from the previous 200
 curl -sS -o /dev/null -w '%{http_code}\n' \
   -H 'If-None-Match: "<etag-from-previous-response>"' \
-  https://scan.illek.ie/api/scans/<reportId>
+  https://vulnscope.illek.ie/api/scans/<reportId>
 
 # MCP: initialize, then call a tool (stateless; no session handshake needed)
-curl -sS -X POST https://scan.illek.ie/mcp/v2 \
+curl -sS -X POST https://vulnscope.illek.ie/mcp/v2 \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25"}}'
-curl -sS -X POST https://scan.illek.ie/mcp/v2 \
+curl -sS -X POST https://vulnscope.illek.ie/mcp/v2 \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"scan_website","arguments":{"url":"example.com"}}}'
 ```
@@ -122,4 +126,4 @@ gitignored. Production values in `wrangler.toml` are unaffected.
 
 MIT © Koya Illek. See [LICENSE](LICENSE).
 
-Live service: [scan.illek.ie](https://scan.illek.ie).
+Live service: [vulnscope.illek.ie](https://vulnscope.illek.ie).

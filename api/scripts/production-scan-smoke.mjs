@@ -1,4 +1,4 @@
-const baseUrl = process.env.VULNSCOPE_BASE_URL || "https://scan.illek.ie";
+const baseUrl = process.env.VULNSCOPE_BASE_URL || "https://vulnscope.illek.ie";
 const successfulTarget =
   process.env.VULNSCOPE_SMOKE_TARGET ||
   `https://example.com/?vulnscope-smoke=${Date.now()}`;

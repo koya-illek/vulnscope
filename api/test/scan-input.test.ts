@@ -6,7 +6,7 @@ const env = { ALLOWED_ORIGINS: "" } as unknown as Env;
 const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
 
 async function post(body: Record<string, unknown>): Promise<Response> {
-  return worker.fetch(new Request("https://scan.illek.ie/api/v2/scan", {
+  return worker.fetch(new Request("https://vulnscope.illek.ie/api/v2/scan", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

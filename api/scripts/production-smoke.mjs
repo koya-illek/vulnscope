@@ -1,6 +1,6 @@
 import { pathToFileURL } from "node:url";
 
-const defaultBaseUrl = process.env.VULNSCOPE_BASE_URL || "https://scan.illek.ie";
+const defaultBaseUrl = process.env.VULNSCOPE_BASE_URL || "https://vulnscope.illek.ie";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);

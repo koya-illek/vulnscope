@@ -1,5 +1,5 @@
 # Local `wrangler dev` only. Copy this file to api/.dev.vars (gitignored).
 # Do not put production secrets here.
 ENVIRONMENT=development
-ALLOWED_ORIGINS=http://scan.illek.ie,http://localhost:8788
+ALLOWED_ORIGINS=http://vulnscope.illek.ie,http://scan.illek.ie,http://localhost:8788
 RATE_LIMIT_HMAC_KEY=local-dev-only-rate-limit-hmac-key-do-not-use-in-prod

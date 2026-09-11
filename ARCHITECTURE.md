@@ -157,7 +157,7 @@ Detected CMS versions remain fingerprint evidence. VulnScope does not grade a Wo
 - Cloudflare DNS-over-HTTPS is primary. A transport failure retries the same record through Google Public DNS. A valid empty answer is preserved and does not trigger fallback.
 - Same-host access is the default. Limited same-registrable-domain access remains subject to public DNS checks.
 - A non-success main GET is recorded as failed coverage. VulnScope does not audit or grade the headers of that error response.
-- The production Worker rejects scans of its own hostname because a same-zone Worker fetch cannot provide an independent public observation.
+- The production Worker rejects scans of its own hostnames (`vulnscope.illek.ie` and `scan.illek.ie`) because a same-zone Worker fetch cannot provide an independent public observation.
 - Forms are not submitted, credentials are not accepted, and destructive HTTP methods are not used.
 - Response bodies, request bodies, concurrency, elapsed time, and redirect depth are bounded.
 - Stored cookie values, URL secrets, query values, and fragments are removed.
@@ -168,7 +168,7 @@ See `THREAT_MODEL.md` for threats, controls, residual risk, and operational gate
 
 ## Deployment topology
 
-Production uses one Cloudflare Worker and asset binding on `scan.illek.ie`. The Worker runs first for static and API paths, D1 is bound as `DB`, observability is enabled, and cleanup runs daily at `23 4 * * *` UTC. `workers.dev`, preview URLs, and Pages deployments are disabled.
+Production uses one Cloudflare Worker and asset binding on `vulnscope.illek.ie`, with `scan.illek.ie` attached as a permanent redirect to that origin. The Worker runs first for static and API paths, D1 is bound as `DB`, observability is enabled, and cleanup runs daily at `23 4 * * *` UTC. `workers.dev`, preview URLs, and Pages deployments are disabled.
 
 ## Failure model
 

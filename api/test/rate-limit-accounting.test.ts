@@ -30,7 +30,7 @@ describe("quota accounting boundaries", () => {
   it("does not charge malformed report IDs", async () => {
     const prepare = vi.fn();
     const response = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/not-a-report"),
+      new Request("https://vulnscope.illek.ie/api/scans/not-a-report"),
       envWithDb(prepare),
       ctx,
     );
@@ -40,7 +40,7 @@ describe("quota accounting boundaries", () => {
 
   it("does not write quota state for MCP discovery or initialization", async () => {
     const prepare = vi.fn(() => { throw new Error("unexpected D1 write"); });
-    const request = new Request("https://scan.illek.ie/mcp", {
+    const request = new Request("https://vulnscope.illek.ie/mcp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-11-25" } }),
@@ -53,7 +53,27 @@ describe("quota accounting boundaries", () => {
   it("rejects a self-scan before charging quota or creating a false grade", async () => {
     const prepare = vi.fn();
     const response = await worker.fetch(
-      new Request("https://scan.illek.ie/api/v2/scan", {
+      new Request("https://vulnscope.illek.ie/api/v2/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: "https://vulnscope.illek.ie" }),
+      }),
+      envWithDb(prepare),
+      ctx,
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "VulnScope cannot scan its own hostname from inside the same Cloudflare Worker. Use a different public target.",
+    });
+    expect(prepare).not.toHaveBeenCalled();
+  });
+
+  it("rejects a scan of the legacy public hostname the same way", async () => {
+    const prepare = vi.fn();
+    const response = await worker.fetch(
+      new Request("https://vulnscope.illek.ie/api/v2/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: "https://scan.illek.ie" }),
@@ -86,7 +106,7 @@ describe("quota accounting boundaries", () => {
     });
     try {
       const response = await worker.fetch(
-        new Request("https://scan.illek.ie/api/v2/scan", {
+        new Request("https://vulnscope.illek.ie/api/v2/scan", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ url: "https://example.com" }),
@@ -134,7 +154,7 @@ describe("quota accounting boundaries", () => {
     );
     try {
       const response = await worker.fetch(
-        new Request("https://scan.illek.ie/api/v2/scan", {
+        new Request("https://vulnscope.illek.ie/api/v2/scan", {
           method: "POST",
           headers: { "Content-Type": "application/json", "CF-Connecting-IP": "203.0.113.7" },
           body: JSON.stringify({ url: "https://example.com" }),
@@ -290,7 +310,7 @@ describe("recent-scan cache isolation", () => {
 
     try {
       const first = await worker.fetch(
-        new Request("https://scan.illek.ie/api/v2/scan", {
+        new Request("https://vulnscope.illek.ie/api/v2/scan", {
           method: "POST",
           headers: { "Content-Type": "application/json", "CF-Connecting-IP": "203.0.113.7" },
           body: JSON.stringify({ url: "https://example.com" }),
@@ -302,7 +322,7 @@ describe("recent-scan cache isolation", () => {
       expect(analyzeUrl).toHaveBeenCalledTimes(1);
 
       const stranger = await worker.fetch(
-        new Request("https://scan.illek.ie/api/v2/scan", {
+        new Request("https://vulnscope.illek.ie/api/v2/scan", {
           method: "POST",
           headers: { "Content-Type": "application/json", "CF-Connecting-IP": "198.51.100.9" },
           body: JSON.stringify({ url: "https://example.com" }),
@@ -314,7 +334,7 @@ describe("recent-scan cache isolation", () => {
       expect(analyzeUrl).toHaveBeenCalledTimes(2);
 
       const repeat = await worker.fetch(
-        new Request("https://scan.illek.ie/api/v2/scan", {
+        new Request("https://vulnscope.illek.ie/api/v2/scan", {
           method: "POST",
           headers: { "Content-Type": "application/json", "CF-Connecting-IP": "203.0.113.7" },
           body: JSON.stringify({ url: "https://example.com" }),
@@ -336,7 +356,7 @@ describe("operator-visible HMAC configuration errors", () => {
     stubCache();
     try {
       const response = await worker.fetch(
-        new Request("https://scan.illek.ie/api/v2/scan", {
+        new Request("https://vulnscope.illek.ie/api/v2/scan", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ url: "https://example.com" }),
@@ -368,7 +388,7 @@ describe("report read quota", () => {
       }),
     }));
     const first = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop"),
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop"),
       envWithDb(prepare),
       ctx,
     );
@@ -377,7 +397,7 @@ describe("report read quota", () => {
     const etag = first.headers.get("etag") || "";
 
     const revalidated = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop", { headers: { "If-None-Match": etag } }),
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop", { headers: { "If-None-Match": etag } }),
       envWithDb(prepare),
       ctx,
     );

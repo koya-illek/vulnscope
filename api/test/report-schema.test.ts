@@ -85,7 +85,7 @@ async function loadStoredReport(report: unknown) {
     REPORT_DAILY_LIMIT: "80",
   } as unknown as Env;
   const response = await worker.fetch(
-    new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop"),
+    new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop"),
     env,
     ctx,
   );
@@ -202,7 +202,7 @@ describe("stored VulnScope report compatibility", () => {
     } as unknown as Env;
 
     const response = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop"),
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop"),
       env,
       ctx,
     );
