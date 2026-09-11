@@ -69,6 +69,8 @@ export interface AnalyzerProgress {
 export interface AnalyzerOptions {
   probePaths: boolean;
   checkTakeover: boolean;
+  checkWordPress?: boolean;
+  probeTrace?: boolean;
   maxPaths?: number;
   maxSubrequests?: number;
   maxConcurrent?: number;
@@ -286,9 +288,12 @@ export async function analyzeUrl(
     emit({ stage: "secrets", message: "Secret scan skipped" });
   }
 
-  // --- WordPress checks (Phase 5c) ---
+  // --- WordPress checks (opt-in deep probes) ---
   let wpFindings: WpFinding[] = [];
-  if (status !== "failed" && fingerprintResult.cms?.name === "WordPress" && response) {
+  if (!options.checkWordPress) {
+    coverage.wordpress = { status: "skipped", detail: "WordPress deep checks were not enabled for this scan.", requested: false };
+    emit({ stage: "wordpress", message: "WordPress scan skipped" });
+  } else if (status !== "failed" && fingerprintResult.cms?.name === "WordPress" && response) {
     setOutboundPhase(outbound, "wordpress");
     wpFindings = await scanWordPress(initial, outbound);
     coverage.wordpress = phaseCoverage(outbound, "wordpress", `WordPress checks completed with ${wpFindings.length} finding(s).`, true);
@@ -298,12 +303,19 @@ export async function analyzeUrl(
     emit({ stage: "wordpress", message: "WordPress scan skipped (not WordPress)" });
   }
 
-  // --- HTTP methods (Phase 5d) ---
+  // --- HTTP methods (TRACE is opt-in) ---
   let methodResults: { methods: MethodResult[]; traceVulnerable: boolean };
   if (status !== "failed") {
     setOutboundPhase(outbound, "methods");
-    methodResults = await probeMethods(initial.toString(), outbound);
-    coverage.methods = phaseCoverage(outbound, "methods", "OPTIONS Allow and non-mutating TRACE reconnaissance completed.", true);
+    methodResults = await probeMethods(initial.toString(), outbound, { probeTrace: options.probeTrace === true });
+    coverage.methods = phaseCoverage(
+      outbound,
+      "methods",
+      options.probeTrace
+        ? "OPTIONS Allow and non-mutating TRACE reconnaissance completed."
+        : "OPTIONS Allow reconnaissance completed.",
+      true,
+    );
     emit({ stage: "methods", message: methodResults.traceVulnerable ? "XST vulnerability detected" : `HTTP methods: ${methodResults.methods.length} allowed` });
   } else {
     methodResults = { methods: [], traceVulnerable: false };
@@ -650,7 +662,7 @@ function secretFindingsAsFindings(secrets: SecretFinding[]): Finding[] {
     category: "secret" as const,
     title: `Exposed ${s.type} in JavaScript`,
     detail: `A ${s.type.replace(/-/g, " ")} was found in ${s.source} at approximately line ${s.line}.`,
-    evidence: s.snippet,
+    evidence: `${s.type} fingerprint ${s.hash} at line ${s.line} in ${s.source}`,
     recommendation: "Remove hardcoded secrets from client-side code. Use environment variables injected at build time or a server-side secrets manager.",
   }));
 }

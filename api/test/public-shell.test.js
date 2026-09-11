@@ -13,6 +13,8 @@ describe("public shell", () => {
     expect(favicon).toMatch(/VulnScope/);
     expect(html).toMatch(/Optional scan scope/);
     expect(html).toMatch(/I confirm I own or have permission to scan this target/);
+    expect(html).toMatch(/WordPress deep checks/);
+    expect(html).toMatch(/Probe HTTP TRACE/);
     expect(html).toMatch(/Run authorised scan/);
     expect(html).toMatch(/id="scan-button"[^>]*disabled/);
     // The scan-progress live region covers the stage title only; the route

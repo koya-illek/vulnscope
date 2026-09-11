@@ -119,9 +119,35 @@ describe("calculateGrade", () => {
     expect(calculateGrade(findings)).toBe("B");
   });
 
-  it("returns C for exactly 3 medium (not more than 3)", () => {
+  it("returns A for 3 or fewer medium findings, including heuristic secrets", () => {
     const findings = [makeFinding("medium"), makeFinding("medium"), makeFinding("medium")];
     expect(calculateGrade(findings)).toBe("A");
+  });
+
+  it("does not let generic secret findings force grade D or F", () => {
+    const genericSecrets: Finding[] = [
+      {
+        id: "secret-generic-api-key-0",
+        severity: "medium",
+        category: "secret",
+        title: "Exposed generic-api-key in JavaScript",
+        detail: "A generic api key was found.",
+        evidence: "generic-api-key fingerprint abc at line 1 in https://example.com/app.js",
+        recommendation: "Remove hardcoded secrets.",
+      },
+      {
+        id: "secret-generic-secret-0",
+        severity: "medium",
+        category: "secret",
+        title: "Exposed generic-secret in JavaScript",
+        detail: "A generic secret was found.",
+        evidence: "generic-secret fingerprint def at line 2 in https://example.com/app.js",
+        recommendation: "Remove hardcoded secrets.",
+      },
+    ];
+    expect(calculateGrade(genericSecrets)).toBe("A");
+    expect(calculateGrade(genericSecrets)).not.toBe("D");
+    expect(calculateGrade(genericSecrets)).not.toBe("F");
   });
 });
 

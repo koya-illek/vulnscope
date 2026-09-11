@@ -6,10 +6,16 @@ const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as Execut
 
 function databaseReturning(report: unknown): D1Database {
   return {
-    prepare() {
+    prepare(sql: string) {
       return {
         bind() {
-          return { first: async () => ({ report_json: JSON.stringify(report) }) };
+          return {
+            first: async () => {
+              if (sql.includes("INSERT INTO rate_limits")) return { request_count: 1 };
+              return { report_json: JSON.stringify(report) };
+            },
+            run: async () => undefined,
+          };
         },
       };
     },
@@ -73,7 +79,11 @@ function storedV2Report(overrides: Record<string, unknown> = {}) {
 }
 
 async function loadStoredReport(report: unknown) {
-  const env = { DB: databaseReturning(report) } as unknown as Env;
+  const env = {
+    DB: databaseReturning(report),
+    RATE_LIMIT_HMAC_KEY: "test-only-rate-limit-hmac-key-32-bytes",
+    REPORT_DAILY_LIMIT: "80",
+  } as unknown as Env;
   const response = await worker.fetch(
     new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop"),
     env,
@@ -185,7 +195,11 @@ describe("stored VulnScope report compatibility", () => {
       observation: { vantage: "cloudflare-edge", disclaimer: "Legacy report" },
       summary: { grade: "A", critical: 0, high: 0, medium: 0, low: 0, info: 0 },
     };
-    const env = { DB: databaseReturning(legacy) } as unknown as Env;
+    const env = {
+      DB: databaseReturning(legacy),
+      RATE_LIMIT_HMAC_KEY: "test-only-rate-limit-hmac-key-32-bytes",
+      REPORT_DAILY_LIMIT: "80",
+    } as unknown as Env;
 
     const response = await worker.fetch(
       new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop"),

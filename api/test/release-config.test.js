@@ -17,6 +17,16 @@ describe("production Worker routing", () => {
 
     expect(config).not.toMatch(/^RATE_LIMIT_HMAC_KEY\s*=/m);
   });
+
+  it("ships a secret-free local-dev example instead of a committed .dev.vars file", async () => {
+    const example = await readFile(new URL("../.dev.vars.example", import.meta.url), "utf8");
+    expect(example).toMatch(/^ENVIRONMENT=development$/m);
+    expect(example).toMatch(/^ALLOWED_ORIGINS=/m);
+    expect(example).toMatch(/^RATE_LIMIT_HMAC_KEY=.+$/m);
+    const key = example.match(/^RATE_LIMIT_HMAC_KEY=(.+)$/m)?.[1] || "";
+    expect(key.length).toBeGreaterThanOrEqual(32);
+    expect(example).not.toMatch(/sk_live_|AKIA|ghp_/);
+  });
 });
 
 describe("release version alignment", () => {

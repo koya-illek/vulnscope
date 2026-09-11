@@ -9,24 +9,33 @@ storage, probe-budget, deployment, and third-party service design.
 
 The public beta applies one outbound policy to the initial URL, redirects,
 scripts, WordPress checks, CORS probes, methods, and takeover evidence. A scan
-allows at most 46 outbound requests, six concurrent outbound connections, a
-25-second outbound-work deadline, and bounded response bodies. Sensitive path
-and takeover phases are opt-in and report partial coverage when the safe
+allows at most 46 outbound requests (32 on MCP), six concurrent outbound
+connections (four on MCP), a 25-second outbound-work deadline (15 seconds on
+MCP), and bounded response bodies. Sensitive path, takeover, WordPress deep
+checks, and TRACE probing are opt-in and report partial coverage when the safe
 budget is exhausted.
 Reports are opaque bearer links: anyone with the report ID can read an
 unexpired report, so share links only with approved reviewers. Reports expire
 after the configured retention period, are served with private no-store
 caching, and remove cookie values plus query and fragment components from
-stored URL evidence. Read [THREAT_MODEL.md](./THREAT_MODEL.md) before
-operating a deployment.
+stored URL evidence. Secret findings store a SHA-256 fingerprint of the
+match, never prefix, suffix, or connection-string userinfo. Read
+[THREAT_MODEL.md](./THREAT_MODEL.md) before operating a deployment.
 
 Daily quota identifiers use a scope-specific HMAC and never store the source
 IP address. Before the first production deployment, generate a random secret
 of at least 32 bytes and store it with
 `cd api && npx wrangler secret put RATE_LIMIT_HMAC_KEY`. Do not put the
-production value in `wrangler.toml` or `.dev.vars`. Validation failures and
-recent-scan cache hits are uncharged, and a scan aborted by a VulnScope
+production value in `wrangler.toml` or `.dev.vars`. A missing or short HMAC
+key fails closed with an operator-visible error. Validation failures and
+recent-scan cache hits are uncharged, recent-scan cache keys are scoped to
+the caller's daily quota identity, and a scan aborted by a VulnScope
 resolver outage is refunded so the invited retry is free.
+
+MCP remains publicly usable for testing (no API key). The MCP daily scan
+quota defaults to 10, well below the web-form quota of 50, and is clamped to
+at most 20. Well-formed report reads share a separate daily cap (default 80);
+ETag revalidation is uncharged so polling agents are not exhausted.
 
 In the browser, VulnScope keeps a local-only list of the reports this browser
 has seen (ID, hostname, grade, timestamps) under the scan form, and a report
@@ -56,7 +65,7 @@ newline-delimited JSON (`application/x-ndjson`). Copilot Studio can import
 # Create a scan (201 with the full report; charges the daily web quota)
 curl -sS -X POST https://scan.illek.ie/api/v2/scan \
   -H 'Content-Type: application/json' \
-  -d '{"url": "example.com", "probePaths": false, "checkTakeover": false}'
+  -d '{"url": "example.com", "probePaths": false, "checkTakeover": false, "checkWordPress": false, "probeTrace": false}'
 
 # The same scan with newline-delimited progress events
 curl -sS -X POST https://scan.illek.ie/api/scans/stream \
@@ -98,9 +107,11 @@ approval.
 
 ## Local development
 
-From `api/`, run `npx wrangler dev --local` and open
-`http://localhost:8788`. The session runs in the development environment via
-`api/.dev.vars`, which disables the production HTTP→HTTPS entry redirect that
-would otherwise loop forever under `wrangler dev`'s custom-domain emulation
-and allowlists the emulated origin so the page can call the API same-origin.
-Production values in `wrangler.toml` are unaffected.
+From `api/`, copy `api/.dev.vars.example` to `api/.dev.vars`, then run
+`npx wrangler dev --local` and open `http://localhost:8788`. The session runs
+in the development environment via `api/.dev.vars`, which disables the
+production HTTP→HTTPS entry redirect that would otherwise loop forever under
+`wrangler dev`'s custom-domain emulation and allowlists the emulated origin so
+the page can call the API same-origin. The example file also supplies a dummy
+`RATE_LIMIT_HMAC_KEY` of at least 32 bytes. Keep the real `api/.dev.vars` file
+gitignored. Production values in `wrangler.toml` are unaffected.

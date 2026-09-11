@@ -291,7 +291,9 @@ export interface SecretFinding {
   // Heuristic shapes that also match ordinary minified JavaScript are capped
   // at medium so one false positive cannot fail an otherwise clean grade.
   severity: "critical" | "high" | "medium";
-  snippet: string;    // redacted — first 8 chars + "..." + last 4 chars
+  // SHA-256 of the matched value. Reports never store prefix, suffix, or
+  // connection-string userinfo — only this non-reversible fingerprint.
+  hash: string;
   line: number;       // approximate line number
   source: string;     // query/fragment-free JS bundle URL
   confidence?: "high" | "medium" | "low";
@@ -326,6 +328,7 @@ export interface Env {
   REPORT_RETENTION_DAYS: string;
   DAILY_SCAN_LIMIT: string;
   MCP_DAILY_LIMIT: string;
+  REPORT_DAILY_LIMIT: string;
   RATE_LIMIT_HMAC_KEY: string;
   MAX_PATH_PROBES?: string;
   MAX_SCAN_SUBREQUESTS?: string;

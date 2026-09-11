@@ -7,13 +7,19 @@ const TRACE_CANARY_PREFIX = "VulnScanner-Trace";
 /**
  * Probe which HTTP methods are allowed on the target URL.
  *
- * Sends OPTIONS (checking the Allow header) and TRACE (checking for XST).
- * Methods advertised by Allow are reported as advertisements only; this
- * scanner never sends mutating PUT or DELETE requests to a target.
+ * Default scans send OPTIONS and read the Allow header. TRACE probing is
+ * opt-in. Methods advertised by Allow are reported as advertisements only;
+ * this scanner never sends mutating PUT or DELETE requests to a target.
  */
+export interface ProbeMethodsOptions {
+  /** Opt in to a TRACE probe. Default scans only read the OPTIONS Allow header. */
+  probeTrace?: boolean;
+}
+
 export async function probeMethods(
   targetUrl: string,
   context?: OutboundContext,
+  options: ProbeMethodsOptions = {},
 ): Promise<{ methods: MethodResult[]; traceVulnerable: boolean }> {
   const results = new Map<string, MethodResult>();
   let traceVulnerable = false;
@@ -29,11 +35,13 @@ export async function probeMethods(
     });
   }
 
-  // --- 2. TRACE — check for Cross-Site Tracing (XST) ---
-  const traceResult = await checkTrace(targetUrl, context);
-  if (traceResult) {
-    results.set(traceResult.result.method, mergeMethodResult(results.get(traceResult.result.method), traceResult.result));
-    traceVulnerable = traceResult.vulnerable;
+  // --- 2. TRACE — opt-in Cross-Site Tracing (XST) probe ---
+  if (options.probeTrace === true) {
+    const traceResult = await checkTrace(targetUrl, context);
+    if (traceResult) {
+      results.set(traceResult.result.method, mergeMethodResult(results.get(traceResult.result.method), traceResult.result));
+      traceVulnerable = traceResult.vulnerable;
+    }
   }
 
   return { methods: [...results.values()], traceVulnerable };

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { handleMcp, sanitizeToolError } from "../src/mcp";
-import { BlockedTargetError, InputError, RateLimitError, ResolverUnavailableError } from "../src/security";
+import { BlockedTargetError, ConfigurationError, InputError, RateLimitError, ResolverUnavailableError } from "../src/security";
 import { OutboundPolicyError } from "../src/outbound";
 import type { ScanReport } from "../src/types";
 
@@ -90,16 +90,24 @@ describe("VulnScope MCP", () => {
     expect(body.result.tools.map(tool => tool.name)).toEqual(["scan_website", "get_vulnscope_report"]);
     expect(body.result.tools.every(tool => tool.inputSchema && tool.outputSchema)).toBe(true);
     expect(body.result.tools[0].description).toContain("does not exploit");
+    expect(JSON.stringify(body.result.tools[0].inputSchema)).toContain("checkWordPress");
+    expect(JSON.stringify(body.result.tools[0].inputSchema)).toContain("probeTrace");
   });
 
   it("passes explicit scan options to the shared engine", async () => {
     const execute = vi.fn(async () => report);
     const response = await handleMcp(rpc("tools/call", {
       name: "scan_website",
-      arguments: { url: "https://example.com", probePaths: false, checkTakeover: true },
+      arguments: { url: "https://example.com", probePaths: false, checkTakeover: true, checkWordPress: true, probeTrace: true },
     }), execute);
     const body = await response.json<{ result: { structuredContent: ScanReport } }>();
-    expect(execute).toHaveBeenCalledWith("scan_website", { url: "https://example.com", probePaths: false, checkTakeover: true });
+    expect(execute).toHaveBeenCalledWith("scan_website", {
+      url: "https://example.com",
+      probePaths: false,
+      checkTakeover: true,
+      checkWordPress: true,
+      probeTrace: true,
+    });
     expect(body.result.structuredContent.summary.grade).toBe("A");
   });
 
@@ -188,6 +196,7 @@ describe("VulnScope MCP", () => {
     const resolver = new ResolverUnavailableError("resolvers down");
     const quota = new RateLimitError("Daily scan limit of 10 reached.", 10, 11, "2026-08-22T23:59:59.999Z");
     const policy = new OutboundPolicyError("The scan time budget was exhausted.", "budget");
+    const config = new ConfigurationError("RATE_LIMIT_HMAC_KEY is missing or shorter than 32 bytes.");
     const internal = new Error("secret internals");
 
     expect(sanitizeToolError(input)).toBe(input);
@@ -195,6 +204,7 @@ describe("VulnScope MCP", () => {
     expect(sanitizeToolError(resolver)).toBe(resolver);
     expect(sanitizeToolError(quota)).toBe(quota);
     expect(sanitizeToolError(policy)).toBe(policy);
+    expect(sanitizeToolError(config)).toBe(config);
 
     const sanitizedInternal = sanitizeToolError(internal);
     expect(sanitizedInternal).not.toBe(internal);

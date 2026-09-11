@@ -93,6 +93,16 @@ const SOFT_404_MARKERS = [
   "could not be found",
 ];
 
+const SPA_SHELL_MARKERS = [
+  'id="root"',
+  "id='root'",
+  'id="app"',
+  "id='app'",
+  "__next_data__",
+  "data-reactroot",
+  "ng-version",
+];
+
 const SIGNATURE_MATCH_THRESHOLD = 2;
 const DEFAULT_PROBE_PATH_LIMIT = 18;
 
@@ -175,15 +185,13 @@ export async function probePaths(
   options: ProbeOptions,
 ): Promise<ExposedPath[]> {
   const { baseUrl, homepageBody } = options;
-  const homepageLength = homepageBody.length;
-  const homepageLower = homepageBody.slice(0, 5000).toLowerCase();
 
   // Keep the opt-in phase below the Workers Free budget. The full catalogue
   // remains available as an explicit bounded option for a paid or private
   // deployment, but the public beta probes only a small rotated subset.
   const entries = selectProbeEntries(options.maxPaths ?? DEFAULT_PROBE_PATH_LIMIT);
   const results = await Promise.allSettled(
-    entries.map((entry) => probeSinglePath(baseUrl, entry, homepageLength, homepageLower, options.context)),
+    entries.map((entry) => probeSinglePath(baseUrl, entry, homepageBody, options.context)),
   );
 
   const exposed: ExposedPath[] = [];
@@ -198,8 +206,7 @@ export async function probePaths(
 async function probeSinglePath(
   baseUrl: URL,
   entry: SensitivePathEntry,
-  homepageLength: number,
-  homepageLower: string,
+  homepageBody: string,
   context?: OutboundContext,
 ): Promise<ExposedPath | null> {
   const target = new URL(entry.path, baseUrl).toString();
@@ -224,40 +231,69 @@ async function probeSinglePath(
       return null;
     }
 
-    // Read first 10KB of body
     const bodyResult = await readBoundedBody(response, 10_240, context, "paths");
-    const body = bodyResult.text;
-    const bodyLower = body.toLowerCase();
-
-    const contentType = (response.headers.get("content-type") || "").toLowerCase();
-    if (contentType && !/(text\/|json|xml|javascript)/i.test(contentType)) return null;
-
-    // Soft-404 detection: identical content is a stronger signal than a
-    // loose length comparison, which incorrectly rejects unrelated pages.
-    if (homepageLower && bodyLower.slice(0, 5000) === homepageLower) return null;
-    if (homepageLength > 0) {
-      const ratio = body.length / homepageLength;
-      if (ratio > 0.98 && ratio < 1.02 && bodyLower.includes("not found")) return null;
-    }
-
-    // Soft-404 detection: contains generic "not found" text
-    if (SOFT_404_MARKERS.some((marker) => bodyLower.includes(marker))) {
-      // But still check if the signatures are strong enough to override
-      const strongMatch = getMatchedSignatures(entry, bodyLower);
-      if (!isStructuredMatch(entry, body, strongMatch) && strongMatch.length < SIGNATURE_MATCH_THRESHOLD) return null;
-    }
-
-    // Check for signature matches
-    const matchedSignatures = getMatchedSignatures(entry, bodyLower);
-
-    if (!isStructuredMatch(entry, body, matchedSignatures) && matchedSignatures.length < minimumMatches(entry)) {
-      return null;
-    }
-
-    return makeExposed(entry, response.status, matchedSignatures, bodyResult.bytes, bodyResult.truncated);
+    return evaluatePathResponse(entry, {
+      status: response.status,
+      body: bodyResult.text,
+      contentType: response.headers.get("content-type") || "",
+      homepageBody,
+      bytes: bodyResult.bytes,
+      truncated: bodyResult.truncated,
+    });
   } catch {
     return null;
   }
+}
+
+/**
+ * Decide whether a 200 response is a genuine sensitive-path hit.
+ * Exported so tests can cover SPA shells and weak signatures without network.
+ */
+export function evaluatePathResponse(
+  entry: SensitivePathEntry,
+  args: {
+    status: number;
+    body: string;
+    contentType: string;
+    homepageBody: string;
+    bytes?: number;
+    truncated?: boolean;
+  },
+): ExposedPath | null {
+  if (args.status !== 200) return null;
+
+  const body = args.body;
+  const bodyLower = body.toLowerCase();
+  const homepageLower = args.homepageBody.slice(0, 5000).toLowerCase();
+  const contentType = args.contentType.toLowerCase();
+  if (contentType && !/(text\/|json|xml|javascript)/i.test(contentType)) return null;
+
+  if (homepageLower && bodyLower.slice(0, 5000) === homepageLower) return null;
+  if (args.homepageBody.length > 0) {
+    const ratio = body.length / args.homepageBody.length;
+    if (ratio > 0.98 && ratio < 1.02 && bodyLower.includes("not found")) return null;
+  }
+
+  const html = looksLikeHtml(body, contentType);
+  const structured = isStructuredMatch(entry, body);
+
+  if (html && isArtefactPath(entry) && !structured) return null;
+  if (html && isHomepageSoftFalsePositive(body, args.homepageBody) && !structured) return null;
+
+  if (SOFT_404_MARKERS.some((marker) => bodyLower.includes(marker))) {
+    if (!structured) return null;
+  }
+
+  const matchedSignatures = getMatchedSignatures(entry, bodyLower);
+  if (!structured && matchedSignatures.length < minimumMatches(entry, html)) {
+    return null;
+  }
+
+  if ((entry.severity === "high" || entry.severity === "critical") && html && !structured && isArtefactPath(entry)) {
+    return null;
+  }
+
+  return makeExposed(entry, args.status, matchedSignatures, args.bytes ?? body.length, args.truncated);
 }
 
 function makeExposed(
@@ -280,8 +316,11 @@ function makeExposed(
   };
 }
 
-function minimumMatches(entry: SensitivePathEntry): number {
+function minimumMatches(entry: SensitivePathEntry, html = false): number {
   if (entry.severity === "info" || entry.severity === "low") return 1;
+  if (html && (entry.severity === "high" || entry.severity === "critical")) {
+    return Math.max(3, Math.min(SIGNATURE_MATCH_THRESHOLD, entry.signatures.length));
+  }
   return Math.min(SIGNATURE_MATCH_THRESHOLD, Math.max(1, entry.signatures.length));
 }
 
@@ -289,13 +328,49 @@ function getMatchedSignatures(entry: SensitivePathEntry, bodyLower: string): str
   return entry.signatures.filter((signature) => signature.length > 0 && bodyLower.includes(signature.toLowerCase()));
 }
 
-function isStructuredMatch(entry: SensitivePathEntry, body: string, matched: string[]): boolean {
+function isStructuredMatch(entry: SensitivePathEntry, body: string): boolean {
   if (entry.path === "/.git/HEAD") return /^ref:\s+refs\/heads\/[a-z0-9._/-]+\s*$/im.test(body.trim());
   if (entry.path.includes("id_rsa") || entry.path.includes("id_dsa") || entry.path.includes(".ssh/")) {
     return /-----BEGIN (?:RSA |DSA |OPENSSH )?PRIVATE KEY-----/.test(body);
   }
+  if (entry.path.includes(".env")) {
+    return /^(?:export\s+)?[A-Z][A-Z0-9_]+=\S+/m.test(body)
+      && /(DB_PASSWORD|API_KEY|SECRET|DATABASE_URL|AWS_|APP_KEY|DEBUG)=/m.test(body);
+  }
+  if (entry.path.endsWith(".sql")) {
+    return /CREATE TABLE|INSERT INTO/.test(body);
+  }
+  if (entry.path.includes(".git/config")) {
+    return /\[core\]/.test(body) && /repositoryformatversion/.test(body);
+  }
   if (entry.path === "/.dockerenv") return false;
-  return matched.length >= minimumMatches(entry);
+  return false;
+}
+
+function looksLikeHtml(body: string, contentType: string): boolean {
+  if (/html/i.test(contentType)) return true;
+  return /<!doctype html|<html[\s>]/i.test(body.slice(0, 2000));
+}
+
+function isArtefactPath(entry: SensitivePathEntry): boolean {
+  return /(\.env|\.sql|\.ya?ml|\.json|\.xml|\.log|\.conf|\.bak|web\.config|\.htaccess|\.git|\.svn|\.ssh|id_rsa|id_dsa|dockerenv|Dockerfile|nginx\.conf)/i.test(entry.path);
+}
+
+function extractTitle(html: string): string {
+  return (html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] || "").trim().toLowerCase();
+}
+
+function looksLikeSpaShell(body: string): boolean {
+  const sample = body.slice(0, 8000).toLowerCase();
+  return SPA_SHELL_MARKERS.some((marker) => sample.includes(marker));
+}
+
+function isHomepageSoftFalsePositive(body: string, homepageBody: string): boolean {
+  if (!homepageBody) return false;
+  const bodyTitle = extractTitle(body);
+  const homeTitle = extractTitle(homepageBody);
+  if (bodyTitle && homeTitle && bodyTitle === homeTitle) return true;
+  return looksLikeSpaShell(body) && looksLikeSpaShell(homepageBody);
 }
 
 const SEVERITY_ORDER: Array<SensitivePathEntry["severity"]> = ["critical", "high", "medium", "low", "info"];
