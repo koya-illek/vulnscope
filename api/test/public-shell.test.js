@@ -7,6 +7,9 @@ describe("public shell", () => {
     const favicon = await readFile(new URL("../../web/favicon.svg", import.meta.url), "utf8");
     const headers = await readFile(new URL("../../web/_headers", import.meta.url), "utf8");
 
+    expect(html).toContain("https://vulnscope.illek.ie/");
+    expect(html).toContain("vulnscope.illek.ie/mcp/v2");
+    expect(html).not.toContain("https://scan.illek.ie/");
     expect(html).toMatch(/property="og:image"/);
     expect(html).toMatch(/<script type="application\/ld\+json">/);
     expect(html).toMatch(/rel="icon"/);

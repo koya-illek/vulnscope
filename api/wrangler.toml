@@ -4,12 +4,17 @@ compatibility_date = "2026-07-23"
 # Route every target fetch through Cloudflare's public front door. Without
 # this, Workers on illek.ie routes are bypassed and their origin can return
 # 403, leaving an otherwise valid scan ungraded. The API rejects self-scans
-# before outbound work, so scan.illek.ie cannot loop back into itself.
+# before outbound work, so vulnscope.illek.ie and scan.illek.ie cannot loop
+# back into this Worker.
 compatibility_flags = ["global_fetch_strictly_public"]
 workers_dev = false
 preview_urls = false
 
+# Both names attach to this Worker. vulnscope.illek.ie is the brand host;
+# scan.illek.ie stays attached so the Worker can 308 it to the canonical
+# origin. `wrangler deploy` from api/ creates/updates both custom domains.
 routes = [
+  { pattern = "vulnscope.illek.ie", custom_domain = true },
   { pattern = "scan.illek.ie", custom_domain = true }
 ]
 
@@ -21,17 +26,15 @@ run_worker_first = true
 [vars]
 ENVIRONMENT = "production"
 # api/.dev.vars overrides ENVIRONMENT to "development" for `wrangler dev`,
-# disabling the HTTP→HTTPS entry redirect (see index.ts). wrangler dev also
-# rewrites request URLs and Origin headers to this custom-domain host over
-# plain HTTP, so the dev CORS allowlist there contains http://scan.illek.ie;
-# the localhost entry below is inert in production CORS because browsers never
-# present that origin against scan.illek.ie.
-# localhost entry exists for `wrangler dev` (browser origin http://localhost:8788).
-# It is inert in production CORS because browsers never present that origin
-# against scan.illek.ie; remove it only together with a dev-environment override.
+# disabling the HTTP→HTTPS entry redirect and the scan.illek.ie host
+# redirect (see index.ts). wrangler dev also rewrites request URLs and
+# Origin headers to a custom-domain host over plain HTTP, so the example
+# allowlist includes http://vulnscope.illek.ie and http://scan.illek.ie;
+# the localhost entry below is inert in production CORS because browsers
+# never present that origin against the public hosts.
 # Localhost entry kept for tooling that presents an explicit localhost origin;
 # see api/.dev.vars for how `wrangler dev` actually rewrites origins.
-ALLOWED_ORIGINS = "https://scan.illek.ie,http://localhost:8788"
+ALLOWED_ORIGINS = "https://vulnscope.illek.ie,http://localhost:8788"
 REPORT_RETENTION_DAYS = "14"
 DAILY_SCAN_LIMIT = "50"
 # MCP stays open for testing (no API key) but is stricter than the web form.

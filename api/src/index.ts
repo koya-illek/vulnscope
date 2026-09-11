@@ -15,7 +15,7 @@ import { handleMcp } from "./mcp";
 import { deriveDailyQuotaKey } from "./quota";
 import { decodeUtf8, readBoundedRequestBody, RequestBodyError } from "./http-body";
 import { reportToMarkdown } from "./markdown";
-import { VERSION, WEBSITE_ORIGIN } from "./version";
+import { VERSION, WEBSITE_ORIGIN, canonicalHttpsUrl, isAliasPublicHost, isServiceHost } from "./version";
 
 const API_VERSION = VERSION;
 const REPORT_SCHEMA_VERSION = 2;
@@ -70,14 +70,20 @@ export default {
     const url = new URL(request.url);
 
     // Static assets are configured to run through this Worker first. Redirect
-    // production HTTP requests before any API or asset handling so every path
-    // (including assets and API endpoints) has one deterministic HTTPS hop.
-    // Local development skips the redirect: `wrangler dev` emulates the
-    // custom-domain host over plain HTTP, so an unconditional guard would
-    // 308-loop every local request. api/.dev.vars sets ENVIRONMENT=development.
-    if (env.ENVIRONMENT !== "development" && url.protocol === "http:" && !isLocalDevelopmentHost(url.hostname)) {
-      url.protocol = "https:";
-      return Response.redirect(url.toString(), 308);
+    // alias hosts and production HTTP requests before any API or asset
+    // handling so every path (including assets and API endpoints) has one
+    // deterministic hop to the canonical HTTPS origin. Local development
+    // skips both guards: `wrangler dev` emulates a custom-domain host over
+    // plain HTTP, so an unconditional guard would 308-loop every local
+    // request. api/.dev.vars sets ENVIRONMENT=development.
+    if (env.ENVIRONMENT !== "development") {
+      if (isAliasPublicHost(url.hostname)) {
+        return Response.redirect(canonicalHttpsUrl(url), 308);
+      }
+      if (url.protocol === "http:" && !isLocalDevelopmentHost(url.hostname)) {
+        url.protocol = "https:";
+        return Response.redirect(url.toString(), 308);
+      }
     }
 
     const origin = allowedOrigin(request, env.ALLOWED_ORIGINS || "");
@@ -317,7 +323,11 @@ async function createScan(
   quota: QuotaPolicy = scanQuotaPolicy(env, "web"),
 ): Promise<ScanReport> {
   const normalized = normalizeUrl(input.url);
-  if (normalized.hostname === new URL(request.url).hostname) {
+  const requestHost = new URL(request.url).hostname;
+  // Reject both the inbound host and every public alias. A same-zone Worker
+  // fetch cannot provide an independent observation of vulnscope.illek.ie or
+  // scan.illek.ie, even when the request arrived on the other name.
+  if (isServiceHost(normalized.hostname) || normalized.hostname === requestHost) {
     throw new BlockedTargetError(
       "VulnScope cannot scan its own hostname from inside the same Cloudflare Worker. Use a different public target.",
     );

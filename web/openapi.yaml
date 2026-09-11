@@ -10,11 +10,11 @@ info:
     and does not exploit vulnerabilities, submit forms, bypass authentication, or
     certify a target as secure. Only scan systems you own or are authorised to test.
 servers:
-  - url: https://scan.illek.ie
+  - url: https://vulnscope.illek.ie
 security: []
 x-ai-usage:
   preferred-interface: REST or JSON MCP
-  mcp-endpoint: https://scan.illek.ie/mcp/v2
+  mcp-endpoint: https://vulnscope.illek.ie/mcp/v2
   mcp-protocol-version: 2025-11-25
   mcp-protocol-versions-supported: [2025-11-25, 2025-06-18]
   mcp-tools: [scan_website, get_vulnscope_report]

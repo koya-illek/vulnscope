@@ -12,13 +12,13 @@ const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as Execut
 
 describe("HEAD request handling", () => {
   it("serves static assets for HEAD instead of falling through to the JSON 404 handler", async () => {
-    const response = await worker.fetch(new Request("https://scan.illek.ie/", { method: "HEAD" }), env, ctx);
+    const response = await worker.fetch(new Request("https://vulnscope.illek.ie/", { method: "HEAD" }), env, ctx);
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
   });
 
   it("treats HEAD /api/health like GET so uptime monitors see a healthy endpoint", async () => {
-    const response = await worker.fetch(new Request("https://scan.illek.ie/api/health", { method: "HEAD" }), env, ctx);
+    const response = await worker.fetch(new Request("https://vulnscope.illek.ie/api/health", { method: "HEAD" }), env, ctx);
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("application/json");
   });

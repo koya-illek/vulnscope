@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { VERSION } from "../src/version";
+import { VERSION, WEBSITE_ORIGIN } from "../src/version";
 import { USER_AGENT } from "../src/outbound";
 
 describe("production Worker routing", () => {
@@ -10,6 +10,15 @@ describe("production Worker routing", () => {
     expect(config).toMatch(
       /^compatibility_flags\s*=\s*\[\s*"global_fetch_strictly_public"\s*\]/m,
     );
+  });
+
+  it("attaches both public custom domains to the same Worker", async () => {
+    const config = await readFile(new URL("../wrangler.toml", import.meta.url), "utf8");
+
+    expect(config).toMatch(/pattern\s*=\s*"vulnscope\.illek\.ie"/);
+    expect(config).toMatch(/pattern\s*=\s*"scan\.illek\.ie"/);
+    expect(config).toMatch(/custom_domain\s*=\s*true/);
+    expect(config).toMatch(/ALLOWED_ORIGINS\s*=\s*"https:\/\/vulnscope\.illek\.ie/);
   });
 
   it("does not commit the production quota HMAC secret as a plain Worker variable", async () => {
@@ -41,5 +50,7 @@ describe("release version alignment", () => {
     expect(openapi).toMatch(new RegExp(`^  version: ["']?${VERSION}["']?$`, "m"));
     expect(copilot).toMatch(new RegExp(`^  version: ["']?${VERSION}["']?$`, "m"));
     expect(USER_AGENT).toContain(`VulnScanner/${VERSION}`);
+    expect(WEBSITE_ORIGIN).toBe("https://vulnscope.illek.ie");
+    expect(USER_AGENT).toContain(WEBSITE_ORIGIN);
   });
 });

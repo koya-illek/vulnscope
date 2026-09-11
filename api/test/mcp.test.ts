@@ -54,7 +54,7 @@ function fullReport(): ScanReport {
 }
 
 function rpc(method: string, params: unknown = {}, id: number | undefined = 1): Request {
-  return new Request("https://scan.illek.ie/mcp/v2", {
+  return new Request("https://vulnscope.illek.ie/mcp/v2", {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
     body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
@@ -151,7 +151,7 @@ describe("VulnScope MCP", () => {
 
   it("acknowledges notifications and rejects GET streams", async () => {
     expect((await handleMcp(rpc("notifications/initialized", {}, undefined), async () => report)).status).toBe(202);
-    expect((await handleMcp(new Request("https://scan.illek.ie/mcp"), async () => report)).status).toBe(405);
+    expect((await handleMcp(new Request("https://vulnscope.illek.ie/mcp"), async () => report)).status).toBe(405);
   });
 
   it("keeps caller-facing error messages and returns them as tool errors", async () => {

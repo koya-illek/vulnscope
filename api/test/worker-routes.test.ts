@@ -76,7 +76,7 @@ function envWithRow(row: { report_json: string } | null): Env {
 describe("report export contract", () => {
   it("slugs hostile stored hostnames into a safe attachment filename", async () => {
     const response = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop/export"),
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop/export"),
       envWithRow({ report_json: storedReportJson(`evil.example";\r\nX-Injected: yes`) }),
       ctx,
     );
@@ -91,7 +91,7 @@ describe("report export contract", () => {
 
   it("answers a well-shaped but expired or missing report with an honest 404", async () => {
     const response = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop"),
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop"),
       envWithRow(null),
       ctx,
     );
@@ -101,7 +101,7 @@ describe("report export contract", () => {
 
   it("serves ?format=markdown as a text/markdown attachment", async () => {
     const response = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop/export?format=markdown"),
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop/export?format=markdown"),
       envWithRow({ report_json: storedReportJson("example.com") }),
       ctx,
     );
@@ -116,7 +116,7 @@ describe("report export contract", () => {
   it("rejects unknown export formats instead of silently returning JSON", async () => {
     for (const format of ["pdf", "md"]) {
       const response = await worker.fetch(
-        new Request(`https://scan.illek.ie/api/scans/abcdefghijklmnop/export?format=${format}`),
+        new Request(`https://vulnscope.illek.ie/api/scans/abcdefghijklmnop/export?format=${format}`),
         envWithRow({ report_json: storedReportJson("example.com") }),
         ctx,
       );
@@ -127,7 +127,7 @@ describe("report export contract", () => {
 
   it("treats HEAD on a report route like GET instead of a JSON 404 miss", async () => {
     const response = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop", { method: "HEAD" }),
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop", { method: "HEAD" }),
       envWithRow(null),
       ctx,
     );
@@ -139,7 +139,7 @@ describe("conditional report reads", () => {
   it("serves an ETag and answers a matching If-None-Match with a bodiless 304", async () => {
     const row = { report_json: storedReportJson("example.com") };
     const first = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop"),
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop"),
       envWithRow(row),
       ctx,
     );
@@ -148,7 +148,7 @@ describe("conditional report reads", () => {
     expect(etag).toMatch(/^"[0-9a-f]{32}"$/);
 
     const revalidated = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop", { headers: { "If-None-Match": etag } }),
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop", { headers: { "If-None-Match": etag } }),
       envWithRow(row),
       ctx,
     );
@@ -157,7 +157,7 @@ describe("conditional report reads", () => {
     expect(await revalidated.text()).toBe("");
 
     const stale = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop", { headers: { "If-None-Match": '"00000000000000000000000000000000"' } }),
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop", { headers: { "If-None-Match": '"00000000000000000000000000000000"' } }),
       envWithRow(row),
       ctx,
     );
@@ -167,14 +167,14 @@ describe("conditional report reads", () => {
   it("honours validator lists and ignores weak tags on strong comparison", async () => {
     const row = { report_json: storedReportJson("example.com") };
     const base = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop"),
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop"),
       envWithRow(row),
       ctx,
     );
     const etag = base.headers.get("etag") || "";
 
     const listed = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop", {
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop", {
         headers: { "If-None-Match": `"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ${etag}` },
       }),
       envWithRow(row),
@@ -183,7 +183,7 @@ describe("conditional report reads", () => {
     expect(listed.status).toBe(304);
 
     const weakened = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop", {
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop", {
         headers: { "If-None-Match": `W/${etag}` },
       }),
       envWithRow(row),
@@ -195,21 +195,21 @@ describe("conditional report reads", () => {
   it("validates markdown exports independently of the JSON representation", async () => {
     const row = { report_json: storedReportJson("example.com") };
     const markdown = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop/export?format=markdown"),
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop/export?format=markdown"),
       envWithRow(row),
       ctx,
     );
     expect(markdown.status).toBe(200);
     const mdEtag = markdown.headers.get("etag") || "";
     const json = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop/export"),
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop/export"),
       envWithRow(row),
       ctx,
     );
     expect(json.headers.get("etag")).not.toBe(mdEtag);
 
     const revalidated = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop/export?format=markdown", {
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop/export?format=markdown", {
         headers: { "If-None-Match": mdEtag },
       }),
       envWithRow(row),
@@ -221,7 +221,7 @@ describe("conditional report reads", () => {
 
 describe("stream endpoint contract", () => {
   async function postStream(body: string, contentType = "application/json"): Promise<Response> {
-    return worker.fetch(new Request("https://scan.illek.ie/api/scans/stream", {
+    return worker.fetch(new Request("https://vulnscope.illek.ie/api/scans/stream", {
       method: "POST",
       headers: { "Content-Type": contentType },
       body,
@@ -229,7 +229,7 @@ describe("stream endpoint contract", () => {
   }
 
   it("emits an accepted progress event before any other stream event", async () => {
-    const response = await postStream(JSON.stringify({ url: "https://scan.illek.ie" }));
+    const response = await postStream(JSON.stringify({ url: "https://vulnscope.illek.ie" }));
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("application/x-ndjson");
     const events = (await response.text()).trim().split("\n").map((line) => JSON.parse(line));
@@ -239,6 +239,16 @@ describe("stream endpoint contract", () => {
     const last = events[events.length - 1];
     expect(last.type).toBe("error");
     expect(last.status).toBe(403);
+  });
+
+  it("rejects a stream scan of the legacy hostname before emitting a result", async () => {
+    const response = await postStream(JSON.stringify({ url: "https://scan.illek.ie" }));
+    expect(response.status).toBe(200);
+    const events = (await response.text()).trim().split("\n").map((line) => JSON.parse(line));
+    const last = events[events.length - 1];
+    expect(last.type).toBe("error");
+    expect(last.status).toBe(403);
+    expect(last.error).toContain("cannot scan its own hostname");
   });
 
   it("answers malformed scan input with a plain JSON error, not a stream", async () => {
@@ -266,7 +276,7 @@ describe("method discipline on known resources", () => {
 
   it("names POST in Allow when a scan resource gets another method", async () => {
     for (const path of ["/api/v2/scan", "/api/scans", "/api/scans/stream"]) {
-      const response = await worker.fetch(new Request(`https://scan.illek.ie${path}`, { method: "GET" }), env, ctx);
+      const response = await worker.fetch(new Request(`https://vulnscope.illek.ie${path}`, { method: "GET" }), env, ctx);
       expect(response.status).toBe(405);
       expect(response.headers.get("allow")).toBe("POST");
       await expect(response.json()).resolves.toEqual({ error: "Method not allowed. Use POST." });
@@ -281,13 +291,13 @@ describe("method discipline on known resources", () => {
       "/api/v2",
       "/api/health",
     ]) {
-      const response = await worker.fetch(new Request(`https://scan.illek.ie${path}`, { method: "DELETE" }), env, ctx);
+      const response = await worker.fetch(new Request(`https://vulnscope.illek.ie${path}`, { method: "DELETE" }), env, ctx);
       expect(response.status).toBe(405);
       expect(response.headers.get("allow")).toBe("GET");
     }
 
     const posted = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop", { method: "POST", body: "{}" }),
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop", { method: "POST", body: "{}" }),
       env,
       ctx,
     );
@@ -297,7 +307,7 @@ describe("method discipline on known resources", () => {
 
   it("keeps OPTIONS answering 204 ahead of the per-resource checks", async () => {
     const response = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop", { method: "OPTIONS" }),
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop", { method: "OPTIONS" }),
       envWithRow(null),
       ctx,
     );
@@ -308,7 +318,7 @@ describe("method discipline on known resources", () => {
 describe("static and discovery surfaces", () => {
   it("adds HSTS to asset responses even when the asset server omits it", async () => {
     const response = await worker.fetch(
-      new Request("https://scan.illek.ie/styles.css"),
+      new Request("https://vulnscope.illek.ie/styles.css"),
       envWithRow(null),
       ctx,
     );
@@ -318,11 +328,12 @@ describe("static and discovery surfaces", () => {
 
   it("advertises every public interface from the API metadata document", async () => {
     const response = await worker.fetch(
-      new Request("https://scan.illek.ie/api/v2"),
+      new Request("https://vulnscope.illek.ie/api/v2"),
       envWithRow(null),
       ctx,
     );
-    const body = await response.json<{ endpoints: Record<string, string> }>();
+    const body = await response.json<{ website: string; endpoints: Record<string, string> }>();
+    expect(body.website).toBe("https://vulnscope.illek.ie");
     expect(body.endpoints.v2Scan).toBe("POST /api/v2/scan");
     expect(body.endpoints.streamScan).toBe("POST /api/scans/stream");
     expect(body.endpoints.exportScan).toBe("GET /api/scans/:id/export");
@@ -330,15 +341,15 @@ describe("static and discovery surfaces", () => {
   });
 
   it("echoes only allowlisted origins on preflight requests", async () => {
-    const env = { ALLOWED_ORIGINS: "https://scan.illek.ie", ENVIRONMENT: "test" } as unknown as Env;
-    const allowed = await worker.fetch(new Request("https://scan.illek.ie/api/v2/scan", {
+    const env = { ALLOWED_ORIGINS: "https://vulnscope.illek.ie", ENVIRONMENT: "test" } as unknown as Env;
+    const allowed = await worker.fetch(new Request("https://vulnscope.illek.ie/api/v2/scan", {
       method: "OPTIONS",
-      headers: { Origin: "https://scan.illek.ie" },
+      headers: { Origin: "https://vulnscope.illek.ie" },
     }), env, ctx);
     expect(allowed.status).toBe(204);
-    expect(allowed.headers.get("access-control-allow-origin")).toBe("https://scan.illek.ie");
+    expect(allowed.headers.get("access-control-allow-origin")).toBe("https://vulnscope.illek.ie");
 
-    const rejected = await worker.fetch(new Request("https://scan.illek.ie/api/v2/scan", {
+    const rejected = await worker.fetch(new Request("https://vulnscope.illek.ie/api/v2/scan", {
       method: "OPTIONS",
       headers: { Origin: "https://evil.example" },
     }), env, ctx);
@@ -351,10 +362,10 @@ describe("static and discovery surfaces", () => {
     // are named in Access-Control-Expose-Headers; ETag revalidation and
     // quota state are useless to a browser agent without them.
     const response = await worker.fetch(
-      new Request("https://scan.illek.ie/api/scans/abcdefghijklmnop", {
-        headers: { Origin: "https://scan.illek.ie" },
+      new Request("https://vulnscope.illek.ie/api/scans/abcdefghijklmnop", {
+        headers: { Origin: "https://vulnscope.illek.ie" },
       }),
-      { ...envWithRow({ report_json: storedReportJson("example.com") }), ALLOWED_ORIGINS: "https://scan.illek.ie" } as Env,
+      { ...envWithRow({ report_json: storedReportJson("example.com") }), ALLOWED_ORIGINS: "https://vulnscope.illek.ie" } as Env,
       ctx,
     );
     expect(response.status).toBe(200);
