@@ -1,4 +1,9 @@
+import { ConfigurationError } from "./security";
+
 const MIN_HMAC_KEY_BYTES = 32;
+
+export const HMAC_KEY_CONFIG_ERROR =
+  "RATE_LIMIT_HMAC_KEY is missing or shorter than 32 bytes. Set it with `npx wrangler secret put RATE_LIMIT_HMAC_KEY` in production, or copy api/.dev.vars.example to api/.dev.vars for local development.";
 
 interface DailyQuotaKeyInput {
   scope: string;
@@ -18,9 +23,12 @@ export async function deriveDailyQuotaKey({
   secret,
 }: DailyQuotaKeyInput): Promise<string> {
   const encoder = new TextEncoder();
+  if (typeof secret !== "string" || secret.length === 0) {
+    throw new ConfigurationError(HMAC_KEY_CONFIG_ERROR);
+  }
   const secretBytes = encoder.encode(secret);
   if (secretBytes.byteLength < MIN_HMAC_KEY_BYTES) {
-    throw new Error("RATE_LIMIT_HMAC_KEY must contain at least 32 UTF-8 bytes.");
+    throw new ConfigurationError(HMAC_KEY_CONFIG_ERROR);
   }
 
   const hmacKey = await crypto.subtle.importKey(

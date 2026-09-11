@@ -1,5 +1,5 @@
 import type { ScanReport } from "./types";
-import { BlockedTargetError, InputError, RateLimitError, ResolverUnavailableError } from "./security";
+import { BlockedTargetError, ConfigurationError, InputError, RateLimitError, ResolverUnavailableError } from "./security";
 import { OutboundPolicyError } from "./outbound";
 import { decodeUtf8, readBoundedRequestBody, RequestBodyError } from "./http-body";
 import { reportToMarkdown } from "./markdown";
@@ -27,6 +27,8 @@ export interface VulnScopeMcpInput {
   url: string;
   probePaths?: boolean;
   checkTakeover?: boolean;
+  checkWordPress?: boolean;
+  probeTrace?: boolean;
 }
 
 /**
@@ -41,7 +43,8 @@ export function sanitizeToolError(error: unknown): Error {
     error instanceof BlockedTargetError ||
     error instanceof ResolverUnavailableError ||
     error instanceof RateLimitError ||
-    error instanceof OutboundPolicyError
+    error instanceof OutboundPolicyError ||
+    error instanceof ConfigurationError
   ) {
     return error;
   }
@@ -97,12 +100,14 @@ export async function handleMcp(
       return rpcError(id, -32602, "format must be \"json\" or \"markdown\"");
     }
   } else {
-    const scanKeys = new Set(["url", "probePaths", "checkTakeover"]);
+    const scanKeys = new Set(["url", "probePaths", "checkTakeover", "checkWordPress", "probeTrace"]);
     if (Object.keys(args).some((key) => !scanKeys.has(key))) return rpcError(id, -32602, "scan_website received an unsupported argument");
     if (typeof args.url !== "string") return rpcError(id, -32602, "scan_website requires a URL");
   }
   if (args.probePaths !== undefined && typeof args.probePaths !== "boolean") return rpcError(id, -32602, "probePaths must be a boolean");
   if (args.checkTakeover !== undefined && typeof args.checkTakeover !== "boolean") return rpcError(id, -32602, "checkTakeover must be a boolean");
+  if (args.checkWordPress !== undefined && typeof args.checkWordPress !== "boolean") return rpcError(id, -32602, "checkWordPress must be a boolean");
+  if (args.probeTrace !== undefined && typeof args.probeTrace !== "boolean") return rpcError(id, -32602, "probeTrace must be a boolean");
 
   try {
     const report = await execute(String(params.name), args);
@@ -142,7 +147,7 @@ function scanTool() {
   return {
     name: "scan_website",
     title: "Scan a public website with VulnScope",
-    description: "Run authorised, unauthenticated web reconnaissance for public exposure, headers, cookies, CORS, fingerprints, secrets, WordPress signals, HTTP method advertisements, DNS, and optional takeover evidence. The tool does not exploit vulnerabilities, submit forms, or bypass authentication.",
+    description: "Run authorised, unauthenticated web reconnaissance for public exposure, headers, cookies, CORS, fingerprints, secrets, advertised HTTP methods, DNS, and optional WordPress, TRACE, path, and takeover evidence. The tool does not exploit vulnerabilities, submit forms, or bypass authentication.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -151,6 +156,8 @@ function scanTool() {
         url: { type: "string", maxLength: 2048, description: "Public HTTP or HTTPS URL you are authorised to assess." },
         probePaths: { type: "boolean", default: false, description: "Opt in to the bounded public sensitive-path catalogue." },
         checkTakeover: { type: "boolean", default: false, description: "Enable bounded subdomain takeover evidence checks." },
+        checkWordPress: { type: "boolean", default: false, description: "Opt in to bounded WordPress deep checks. Ignored when the target is not identified as WordPress." },
+        probeTrace: { type: "boolean", default: false, description: "Opt in to a non-mutating TRACE probe. Default scans only read the OPTIONS Allow header." },
       },
     },
     outputSchema: scanOutputSchema(),

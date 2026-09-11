@@ -8,8 +8,8 @@ interface SecretPattern {
   /**
    * Only structurally unambiguous provider prefixes justify critical/high.
    * Heuristic shapes that also occur in ordinary minified JavaScript are
-   * capped at medium so a single false positive cannot force a grade of F
-   * on a publicly shareable report.
+   * capped at medium so a single false positive cannot force a grade of D
+   * or F on a publicly shareable report.
    */
   severity: "critical" | "high" | "medium";
   regex: RegExp;
@@ -26,26 +26,34 @@ const PATTERNS: SecretPattern[] = [
   { type: "github-token", severity: "critical", confidence: "high", regex: /gh[ps]_[0-9a-zA-Z]{36}/g },
   { type: "github-pat", severity: "critical", confidence: "high", regex: /github_pat_[0-9a-zA-Z_]{82}/g },
   { type: "slack-token", severity: "critical", confidence: "high", regex: /\bxox[baprs]-[0-9a-zA-Z-]{10,}\b/g },
-  { type: "generic-api-key", severity: "high", confidence: "medium", regex: /api[_-]?key\s*[=:]\s*['"][A-Za-z0-9]{32,}['"]/gi },
-  { type: "generic-secret", severity: "high", confidence: "medium", regex: /secret\s*[=:]\s*['"][A-Za-z0-9]{16,}['"]/gi },
+  { type: "generic-api-key", severity: "medium", confidence: "medium", regex: /api[_-]?key\s*[=:]\s*['"][A-Za-z0-9]{32,}['"]/gi },
+  { type: "generic-secret", severity: "medium", confidence: "medium", regex: /secret\s*[=:]\s*['"][A-Za-z0-9]{16,}['"]/gi },
   { type: "private-key", severity: "critical", confidence: "high", regex: /-----BEGIN (RSA |EC )?PRIVATE KEY-----/g },
   // JWT-shaped strings appear routinely in client-side bundles (session and
   // anonymous tokens); presence alone does not demonstrate a leaked secret.
   { type: "jwt-token", severity: "medium", confidence: "medium", regex: /eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\./g },
   { type: "firebase-config", severity: "high", confidence: "high", regex: /apiKey\s*:\s*['"]AIza[0-9A-Za-z\-_]{35}['"]/g },
-  // SK + 32 hex chars also matches ordinary identifiers in minified code;
-  // boundaries plus a high-severity cap keep false positives from failing grades.
-  { type: "twilio-key", severity: "high", confidence: "medium", regex: /\bSK[0-9a-fA-F]{32}\b/g },
+  // SK + 32 hex chars also matches ordinary identifiers in minified code.
+  { type: "twilio-key", severity: "medium", confidence: "medium", regex: /\bSK[0-9a-fA-F]{32}\b/g },
   { type: "sendgrid-key", severity: "critical", confidence: "high", regex: /SG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}/g },
-  { type: "mailgun-key", severity: "high", confidence: "medium", regex: /\bkey-[0-9a-zA-Z]{32}/g },
+  { type: "mailgun-key", severity: "medium", confidence: "medium", regex: /\bkey-[0-9a-zA-Z]{32}/g },
   { type: "connection-string", severity: "critical", confidence: "high", regex: /(?:mongodb|postgres|redis|amqp):\/\/[^:\s]+:[^@\s]+@/g },
 ];
+
+export const MAX_SECRET_FINDINGS = 25;
+
+const SEVERITY_RANK: Record<SecretFinding["severity"], number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+};
 
 // ─── Scanning ──────────────────────────────────────────────────────────────
 
 /**
  * Scan JavaScript bundle contents for hardcoded secrets and API keys.
- * Each finding is redacted — the full secret value is never stored.
+ * Findings store a SHA-256 fingerprint of the match, never prefix/suffix
+ * material or connection-string userinfo.
  */
 export async function scanForSecrets(
   bundles: Array<{ url: string; content: string }>,
@@ -67,7 +75,7 @@ export async function scanForSecrets(
         const nextFinding = {
           type: pattern.type,
           severity: pattern.severity,
-          snippet: redactSecret(matchedValue),
+          hash: await hashSecretValue(matchedValue),
           line,
           source,
           confidence: pattern.confidence,
@@ -86,7 +94,20 @@ export async function scanForSecrets(
     }
   }
 
-  return findings;
+  return capSecretFindings(findings);
+}
+
+export async function hashSecretValue(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function capSecretFindings(findings: SecretFinding[]): SecretFinding[] {
+  if (findings.length <= MAX_SECRET_FINDINGS) return findings;
+  return findings
+    .slice()
+    .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || a.line - b.line)
+    .slice(0, MAX_SECRET_FINDINGS);
 }
 
 function extractSecretValue(value: string): string {
@@ -102,15 +123,4 @@ function extractSecretValue(value: string): string {
 function getLineNumber(content: string, matchIndex: number): number {
   const before = content.slice(0, matchIndex);
   return before.split("\n").length;
-}
-
-/**
- * Redact a secret value, showing only the first 8 and last 4 characters.
- * Short values are further redacted to avoid exposure.
- */
-function redactSecret(value: string): string {
-  if (value.length <= 16) {
-    return value.slice(0, 4) + "..." + value.slice(-2);
-  }
-  return value.slice(0, 8) + "..." + value.slice(-4);
 }

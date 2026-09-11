@@ -3,6 +3,7 @@ import { buildSummary, gradeBlockingCoverageGaps } from "./scorer";
 import {
   allowedOrigin,
   BlockedTargetError,
+  ConfigurationError,
   InputError,
   normalizeUrl,
   RateLimitError,
@@ -94,6 +95,7 @@ export default {
           if (tool === "get_vulnscope_report") {
             const reportId = String(input.reportId || "");
             if (!REPORT_ID.test(reportId)) throw new InputError("A valid 16-character report ID is required.");
+            await enforceRateLimit(request, env, reportQuotaPolicy(env));
             const report = await loadReport(env.DB, reportId);
             if (!report) throw new InputError("Report not found or expired.");
             return report;
@@ -102,6 +104,8 @@ export default {
             url: String(input.url || ""),
             probePaths: input.probePaths === true,
             checkTakeover: input.checkTakeover === true,
+            checkWordPress: input.checkWordPress === true,
+            probeTrace: input.probeTrace === true,
           }, env, ctx, () => {}, scanQuotaPolicy(env, "mcp"));
         });
         return addResponseHeaders(response, { ...securityHeaders(), ...cors });
@@ -163,8 +167,13 @@ export default {
         // disguising itself as a missing resource.
         if (request.method !== "GET") return methodNotAllowed("GET", cors);
         if (!REPORT_ID.test(match[1])) return json({ error: "Report not found" }, 404, cors);
+        // Fail closed on a missing HMAC before any report body is served.
+        await dailyQuotaKeyFor(request, env, "report");
         const report = await loadReport(env.DB, match[1]);
-        if (!report) return json({ error: "Report not found or expired" }, 404, cors);
+        if (!report) {
+          await enforceRateLimit(request, env, reportQuotaPolicy(env));
+          return json({ error: "Report not found or expired" }, 404, cors);
+        }
         // Stored reports are immutable once written and the read-path
         // normalisation is deterministic, so a content hash is an honest
         // strong ETag; polling agents can revalidate instead of re-downloading.
@@ -181,6 +190,7 @@ export default {
             const markdown = reportToMarkdown(report);
             const etag = await etagFor(markdown);
             if (matchesIfNoneMatch(ifNoneMatch, etag)) return notModified(etag, cors);
+            await enforceRateLimit(request, env, reportQuotaPolicy(env));
             return new Response(markdown, {
               headers: {
                 ...cors,
@@ -195,6 +205,7 @@ export default {
           const body = JSON.stringify(report, null, 2);
           const etag = await etagFor(body);
           if (matchesIfNoneMatch(ifNoneMatch, etag)) return notModified(etag, cors);
+          await enforceRateLimit(request, env, reportQuotaPolicy(env));
           return new Response(body, {
             headers: {
               ...cors,
@@ -209,6 +220,7 @@ export default {
         const body = JSON.stringify(report);
         const etag = await etagFor(body);
         if (matchesIfNoneMatch(ifNoneMatch, etag)) return notModified(etag, cors);
+        await enforceRateLimit(request, env, reportQuotaPolicy(env));
         return new Response(body, {
           status: 200,
           headers: {
@@ -244,6 +256,8 @@ interface ScanInput {
   url: string;
   probePaths: boolean;
   checkTakeover: boolean;
+  checkWordPress: boolean;
+  probeTrace: boolean;
 }
 
 async function readScanInput(request: Request): Promise<ScanInput> {
@@ -268,7 +282,7 @@ async function readScanInput(request: Request): Promise<ScanInput> {
   }
   if (!parsed || typeof parsed !== "object") throw new InputError("JSON request body must be an object.");
   const body = parsed as Record<string, unknown>;
-  const allowedKeys = new Set(["url", "probePaths", "checkTakeover"]);
+  const allowedKeys = new Set(["url", "probePaths", "checkTakeover", "checkWordPress", "probeTrace"]);
   if (Object.keys(body).some((key) => !allowedKeys.has(key))) {
     throw new InputError("JSON request body contains an unsupported field.");
   }
@@ -279,10 +293,18 @@ async function readScanInput(request: Request): Promise<ScanInput> {
   if (body.checkTakeover !== undefined && typeof body.checkTakeover !== "boolean") {
     throw new InputError("checkTakeover must be a boolean.");
   }
+  if (body.checkWordPress !== undefined && typeof body.checkWordPress !== "boolean") {
+    throw new InputError("checkWordPress must be a boolean.");
+  }
+  if (body.probeTrace !== undefined && typeof body.probeTrace !== "boolean") {
+    throw new InputError("probeTrace must be a boolean.");
+  }
   return {
     url: body.url,
     probePaths: body.probePaths === true,
     checkTakeover: body.checkTakeover === true,
+    checkWordPress: body.checkWordPress === true,
+    probeTrace: body.probeTrace === true,
   };
 }
 
@@ -302,9 +324,10 @@ async function createScan(
   }
   // Serve a cached recent scan before the quota counter so repeat requests do
   // not burn the caller's daily allowance on work that was already done.
-  // Validation failures above are likewise uncharged; failed target scans
-  // remain charged because the analysis actually ran.
-  const cacheKey = await recentScanCacheKey(request.url, normalized.toString(), input.probePaths, input.checkTakeover);
+  // The cache key includes the daily quota client identity so one caller
+  // cannot reuse another caller's report ID or bypass their own quota.
+  const quotaClientKey = await dailyQuotaKeyFor(request, env, quota.scope);
+  const cacheKey = await recentScanCacheKey(request.url, normalized.toString(), input, quotaClientKey);
   const recentCache = await caches.open("vuln-scanner-recent");
   const cached = await recentCache.match(cacheKey);
   if (cached) {
@@ -331,10 +354,12 @@ async function createScan(
       {
         probePaths: input.probePaths,
         checkTakeover: input.checkTakeover,
+        checkWordPress: input.checkWordPress,
+        probeTrace: input.probeTrace,
         maxPaths: clampInt(env.MAX_PATH_PROBES, 18, 0, 18),
-        maxSubrequests: clampInt(env.MAX_SCAN_SUBREQUESTS, 46, 20, 46),
-        maxConcurrent: clampInt(env.MAX_SCAN_CONCURRENCY, 6, 1, 6),
-        maxDurationMs: clampInt(env.MAX_SCAN_DURATION_MS, 25_000, 5_000, 25_000),
+        maxSubrequests: quota.maxSubrequests,
+        maxConcurrent: quota.maxConcurrent,
+        maxDurationMs: quota.maxDurationMs,
       },
     );
   } catch (error) {
@@ -404,10 +429,14 @@ function streamScan(
 async function recentScanCacheKey(
   requestUrl: string,
   targetUrl: string,
-  probePaths: boolean,
-  checkTakeover: boolean,
+  input: ScanInput,
+  quotaClientKey: string,
 ): Promise<Request> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${targetUrl}:${probePaths}:${checkTakeover}`));
+  const options = `${input.probePaths}:${input.checkTakeover}:${input.checkWordPress}:${input.probeTrace}`;
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`${quotaClientKey}\0${targetUrl}\0${options}`),
+  );
   const hash = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
   const base = new URL(requestUrl);
   return new Request(`${base.origin}/__recent_scan/${hash}`, { method: "GET" });
@@ -417,17 +446,46 @@ export interface QuotaPolicy {
   scope: string;
   limit: number;
   label: string;
+  maxSubrequests: number;
+  maxConcurrent: number;
+  maxDurationMs: number;
 }
 
 /**
  * Web-form and agent scans draw from separate per-IP daily buckets so one
  * caller class cannot exhaust the other's allowance. Both are charged through
- * the same atomic D1 counter.
+ * the same atomic D1 counter. MCP stays publicly usable but is capped below
+ * the web form and uses a tighter per-scan outbound budget.
  */
 export function scanQuotaPolicy(env: Env, source: "web" | "mcp"): QuotaPolicy {
   return source === "mcp"
-    ? { scope: "mcp", limit: clampInt(env.MCP_DAILY_LIMIT, 50, 1, 1000), label: "Daily MCP scan limit" }
-    : { scope: "scan", limit: clampInt(env.DAILY_SCAN_LIMIT, 10, 1, 500), label: "Daily scan limit" };
+    ? {
+      scope: "mcp",
+      limit: clampInt(env.MCP_DAILY_LIMIT, 10, 1, 20),
+      label: "Daily MCP scan limit",
+      maxSubrequests: clampInt(env.MAX_SCAN_SUBREQUESTS, 32, 20, 36),
+      maxConcurrent: clampInt(env.MAX_SCAN_CONCURRENCY, 4, 1, 4),
+      maxDurationMs: clampInt(env.MAX_SCAN_DURATION_MS, 15_000, 5_000, 15_000),
+    }
+    : {
+      scope: "scan",
+      limit: clampInt(env.DAILY_SCAN_LIMIT, 10, 1, 500),
+      label: "Daily scan limit",
+      maxSubrequests: clampInt(env.MAX_SCAN_SUBREQUESTS, 46, 20, 46),
+      maxConcurrent: clampInt(env.MAX_SCAN_CONCURRENCY, 6, 1, 6),
+      maxDurationMs: clampInt(env.MAX_SCAN_DURATION_MS, 25_000, 5_000, 25_000),
+    };
+}
+
+export function reportQuotaPolicy(env: Env): QuotaPolicy {
+  return {
+    scope: "report",
+    limit: clampInt(env.REPORT_DAILY_LIMIT, 80, 20, 200),
+    label: "Daily report read limit",
+    maxSubrequests: 0,
+    maxConcurrent: 0,
+    maxDurationMs: 0,
+  };
 }
 
 function enforceRateLimit(request: Request, env: Env, quota: QuotaPolicy): Promise<void> {
@@ -755,7 +813,8 @@ function normalizeError(error: unknown): { status: number; message: string } {
   if (
     error instanceof InputError ||
     error instanceof BlockedTargetError ||
-    error instanceof ResolverUnavailableError
+    error instanceof ResolverUnavailableError ||
+    error instanceof ConfigurationError
   )
     return { status: error.status, message: error.message };
   if (error instanceof RateLimitError) return { status: 429, message: error.message };

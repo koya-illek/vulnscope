@@ -15,7 +15,7 @@ describe("probeMethods", () => {
 
   it("returns empty results when all methods are rejected", async () => {
     globalThis.fetch = vi.fn(() => Promise.reject(new Error("Network error")));
-    const result = await probeMethods("https://example.com");
+    const result = await probeMethods("https://example.com", undefined, { probeTrace: true });
     expect(result.methods).toEqual([]);
     expect(result.traceVulnerable).toBe(false);
   });
@@ -38,6 +38,27 @@ describe("probeMethods", () => {
     expect(result.methods.map((method) => method.method)).toEqual(["PUT", "DELETE"]);
     expect(result.methods.every((method) => method.observation === "advertised")).toBe(true);
     expect(result.methods[0].evidence).toContain("no PUT request was sent");
+    expect(observedMethods).toEqual(["OPTIONS"]);
+    expect(observedMethods).not.toContain("PUT");
+    expect(observedMethods).not.toContain("DELETE");
+    expect(observedMethods).not.toContain("TRACE");
+  });
+
+  it("sends TRACE only when probeTrace is enabled and still never sends PUT or DELETE", async () => {
+    const observedMethods: string[] = [];
+    globalThis.fetch = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      const method = String(init?.method || "GET").toUpperCase();
+      observedMethods.push(method);
+      if (method === "OPTIONS") {
+        return Promise.resolve(new Response(null, {
+          status: 204,
+          headers: { allow: "GET, HEAD, POST, PUT, DELETE, OPTIONS" },
+        }));
+      }
+      return Promise.resolve(new Response("", { status: 405 }));
+    });
+
+    await probeMethods("https://example.com", undefined, { probeTrace: true });
     expect(observedMethods).toEqual(["OPTIONS", "TRACE"]);
     expect(observedMethods).not.toContain("PUT");
     expect(observedMethods).not.toContain("DELETE");
@@ -54,7 +75,7 @@ describe("probeMethods", () => {
       return Promise.resolve(new Response("", { status: 405 }));
     });
 
-    const result = await probeMethods("https://example.com");
+    const result = await probeMethods("https://example.com", undefined, { probeTrace: true });
     expect(result.methods.find((method) => method.method === "GET")).toBeFalsy();
     expect(result.methods.find((method) => method.method === "HEAD")).toBeFalsy();
     expect(result.methods.find((method) => method.method === "POST")).toBeFalsy();
@@ -72,7 +93,7 @@ describe("probeMethods", () => {
       return Promise.resolve(new Response("", { status: 405 }));
     });
 
-    const result = await probeMethods("https://example.com");
+    const result = await probeMethods("https://example.com", undefined, { probeTrace: true });
     expect(result.traceVulnerable).toBe(true);
     const trace = result.methods.find((method) => method.method === "TRACE");
     expect(trace).toBeTruthy();
@@ -92,7 +113,7 @@ describe("probeMethods", () => {
       return Promise.resolve(new Response("", { status: 405 }));
     });
 
-    const result = await probeMethods("https://example.com");
+    const result = await probeMethods("https://example.com", undefined, { probeTrace: true });
     expect(result.traceVulnerable).toBe(false);
     const trace = result.methods.find((method) => method.method === "TRACE");
     expect(trace).toBeTruthy();
@@ -105,7 +126,7 @@ describe("probeMethods", () => {
       return Promise.resolve(new Response("", { status: 405 }));
     });
 
-    const result = await probeMethods("https://example.com");
+    const result = await probeMethods("https://example.com", undefined, { probeTrace: true });
     expect(result.traceVulnerable).toBe(false);
     const trace = result.methods.find((method) => method.method === "TRACE");
     expect(trace).toBeTruthy();
@@ -122,7 +143,7 @@ describe("probeMethods", () => {
       return Promise.resolve(new Response("OK", { status: 200 }));
     });
 
-    const result = await probeMethods("https://example.com");
+    const result = await probeMethods("https://example.com", undefined, { probeTrace: true });
     const traces = result.methods.filter((method) => method.method === "TRACE");
     expect(traces).toHaveLength(1);
     expect(traces[0].observation).toBe("observed");
@@ -141,14 +162,14 @@ describe("probeMethods", () => {
       return Promise.resolve(new Response(`TRACE X-Test-Header: ${canary}`, { status: 200 }));
     });
 
-    const result = await probeMethods("https://example.com");
+    const result = await probeMethods("https://example.com", undefined, { probeTrace: true });
     expect(result.methods.filter((method) => method.method === "TRACE")).toHaveLength(1);
     expect(result.traceVulnerable).toBe(true);
   });
 
   it("does not report TRACE when 405 returned", async () => {
     globalThis.fetch = vi.fn(() => Promise.resolve(new Response("", { status: 405 })));
-    const result = await probeMethods("https://example.com");
+    const result = await probeMethods("https://example.com", undefined, { probeTrace: true });
     expect(result.methods.find((method) => method.method === "TRACE")).toBeFalsy();
     expect(result.traceVulnerable).toBe(false);
   });
@@ -163,7 +184,7 @@ describe("probeMethods", () => {
       return Promise.resolve(new Response("", { status: 405 }));
     });
 
-    const result = await probeMethods("https://example.com");
+    const result = await probeMethods("https://example.com", undefined, { probeTrace: true });
     expect(result.methods.length).toBeGreaterThan(0);
     for (const method of result.methods) {
       const typed: MethodResult = method;
@@ -181,7 +202,7 @@ describe("probeMethods", () => {
       return Promise.resolve(new Response("", { status: 405 }));
     });
 
-    const result = await probeMethods("https://example.com");
+    const result = await probeMethods("https://example.com", undefined, { probeTrace: true });
     expect(result.methods.find((method) => method.method === "PUT")).toBeFalsy();
     expect(result.methods.find((method) => method.method === "DELETE")).toBeFalsy();
   });

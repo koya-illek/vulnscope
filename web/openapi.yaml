@@ -23,6 +23,8 @@ x-ai-usage:
     - Supply only a public HTTP or HTTPS URL; private, local, and unsafe redirect targets are blocked.
     - Leave probePaths false unless sensitive-path evidence is specifically needed.
     - Leave checkTakeover false unless takeover evidence is specifically needed.
+    - Leave checkWordPress false unless WordPress deep checks are specifically needed.
+    - Leave probeTrace false unless a TRACE/XST probe is specifically needed.
     - A partial or INCOMPLETE report must be described with its coverage gaps.
     - Findings are reconnaissance guidance, not proof of exploitability or security.
 x-availability: Open for testing. Limited requests.
@@ -31,13 +33,13 @@ paths:
     post:
       operationId: scanWebsite
       summary: Scan an authorised public website
-      description: Performs bounded checks for headers, cookies, CORS, DNS, public exposure, fingerprints, secrets, WordPress signals, advertised methods, and optional takeover evidence.
+      description: Performs bounded checks for headers, cookies, CORS, DNS, public exposure, fingerprints, secrets, advertised HTTP methods, and optional WordPress, TRACE, path, and takeover evidence.
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/ScanRequest' }
-            example: { url: 'https://example.com', probePaths: false, checkTakeover: false }
+            example: { url: 'https://example.com', probePaths: false, checkTakeover: false, checkWordPress: false, probeTrace: false }
       responses:
         '201':
           description: Completed or partial scan report
@@ -121,6 +123,8 @@ components:
         url: { type: string, format: uri, maxLength: 2048, description: Public HTTP or HTTPS URL the caller is authorised to assess. }
         probePaths: { type: boolean, default: false, description: Opt in to the bounded catalogue of public sensitive paths. }
         checkTakeover: { type: boolean, default: false, description: Run bounded subdomain takeover evidence checks. }
+        checkWordPress: { type: boolean, default: false, description: Opt in to bounded WordPress deep checks. Ignored when the target is not identified as WordPress. }
+        probeTrace: { type: boolean, default: false, description: Opt in to a non-mutating TRACE probe. Default scans only read the OPTIONS Allow header. }
     ScanReport:
       type: object
       required: [schemaVersion, id, requestedUrl, hostname, status, createdAt, expiresAt, totalDurationMs, observation, outbound, coverage, dns, ssl, fingerprint, headers, cookies, exposedPaths, cors, findings, summary]

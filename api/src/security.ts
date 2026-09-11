@@ -27,6 +27,19 @@ export class RateLimitError extends Error {
   }
 }
 
+/**
+ * Operator-visible configuration failure. Fail closed rather than serving an
+ * opaque generic 500 when a required Worker secret is missing.
+ */
+export class ConfigurationError extends Error {
+  status = 500;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "ConfigurationError";
+  }
+}
+
 export function normalizeUrl(input: unknown): URL {
   if (typeof input !== "string" || input.trim().length === 0 || input.length > 2048) {
     throw new InputError("Enter a URL of no more than 2,048 characters.");
@@ -148,11 +161,20 @@ function isPublicIPv6(value: string): boolean {
   if (/^fe[89ab]/.test(normalized) || normalized.startsWith("ff")) return false;
   if (normalized.startsWith("2001:db8") || normalized.startsWith("2001:0:")) return false;
   if (normalized.startsWith("2001:2:") || normalized.startsWith("2001:10:") || normalized.startsWith("2001:20:")) return false;
-  if (normalized.startsWith("100::") || normalized.startsWith("64:ff9b:1::")) return false;
+  if (normalized.startsWith("100::") || isNat64Prefix(normalized)) return false;
   const first = Number.parseInt(normalized.split(":")[0] || "0", 16);
   // Global unicast is 2000::/3. This excludes reserved 0/3 and future-use
   // ranges while allowing compressed public addresses such as 2001:4860::.
   return first >= 0x2000 && first <= 0x3fff;
+}
+
+/** Well-known NAT64 `64:ff9b::/96` and local-use `64:ff9b:1::/48`. */
+function isNat64Prefix(normalized: string): boolean {
+  return (
+    normalized.startsWith("64:ff9b::") ||
+    normalized.startsWith("64:ff9b:0:") ||
+    normalized.startsWith("64:ff9b:1:")
+  );
 }
 
 export function allowedOrigin(request: Request, configured: string): string | null {

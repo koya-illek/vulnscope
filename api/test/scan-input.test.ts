@@ -31,4 +31,12 @@ describe("REST scan input boundary", () => {
       error: "probePaths must be a boolean.",
     });
   });
+
+  it("defaults WordPress and TRACE options to false", async () => {
+    const response = await post({ url: "https://example.com", checkWordPress: "yes" });
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "checkWordPress must be a boolean.",
+    });
+  });
 });

@@ -25,8 +25,9 @@ It provides:
 - selected response-header and body evidence
 - security-header, cookie, CORS, and supported-method checks
 - technology and public client-side dependency signals
-- bounded WordPress checks
+- bounded WordPress checks when opted in
 - optional sensitive-path probes
+- optional TRACE probing
 - optional subdomain-takeover evidence
 - certificate-transparency history
 - coverage-aware grading, NDJSON progress, shareable reports, REST, OpenAPI, and MCP
@@ -69,8 +70,8 @@ flowchart LR
 | Header and cookie checks | Evaluates browser-facing security headers and cookie attributes without retaining cookie values | `api/src/headers-audit.ts`, `api/src/cookies.ts` |
 | Method and CORS checks | Sends bounded non-destructive requests and interprets each response's policy without combining headers from separate observations | `api/src/methods.ts`, `api/src/cors.ts` |
 | Sensitive-path engine | Runs an opt-in bounded catalogue with content-type, multi-marker, and soft-404 controls | `api/src/paths.ts` |
-| WordPress checks | Runs bounded public WordPress observations | `api/src/wordpress.ts` |
-| Evidence scrubbing | Detects and redacts URL, response, and accidental secret material | `api/src/secrets.ts` |
+| WordPress checks | Runs opt-in bounded public WordPress observations | `api/src/wordpress.ts` |
+| Evidence scrubbing | Detects secrets and stores a non-reversible hash of the match | `api/src/secrets.ts` |
 | Scoring | Converts findings and phase coverage into a grade and severity summary | `api/src/scorer.ts` |
 | MCP adapter | Publishes two typed tools over stateless JSON-RPC HTTP | `api/src/mcp.ts` |
 | Report UI | Starts scans, renders progress, filters evidence, and renders retrieved reports | `web/app.js`, `web/report-view.js` |
@@ -141,9 +142,11 @@ Detected CMS versions remain fingerprint evidence. VulnScope does not grade a Wo
 - Reports expire after 14 days by default.
 - A daily Cron Trigger deletes expired reports and old quota rows.
 - Report and export responses use private, no-store caching.
-- Valid report reads, recent-scan cache hits, and MCP negotiation, discovery, and notifications do not write durable quota state.
-- Web scans and MCP `scan_website` calls charge separate per-IP daily buckets (`DAILY_SCAN_LIMIT` scope `scan`, `MCP_DAILY_LIMIT` scope `mcp`) through the same atomic counter, so one caller class cannot exhaust the other's allowance.
-- D1 stores a versioned HMAC of the quota scope, UTC date, and source IP. `RATE_LIMIT_HMAC_KEY` is a managed Worker secret with at least 32 bytes and is not stored in repository configuration. Rotating it resets the current day's counters.
+- Valid MCP negotiation, discovery, and notifications do not write durable quota state. Well-formed report reads charge a separate daily `report` bucket; ETag revalidation is uncharged.
+- Web scans and MCP `scan_website` calls charge separate per-IP daily buckets (`DAILY_SCAN_LIMIT` scope `scan`, `MCP_DAILY_LIMIT` scope `mcp`) through the same atomic counter, so one caller class cannot exhaust the other's allowance. MCP defaults to 10 scans/day, clamped at 20, with a tighter per-scan outbound budget than the web form.
+- Recent-scan cache keys include the daily quota client identity so cached report IDs cannot leak across callers.
+- D1 stores a versioned HMAC of the quota scope, UTC date, and source IP. `RATE_LIMIT_HMAC_KEY` is a managed Worker secret with at least 32 bytes and is not stored in repository configuration. A missing or short key fails closed. Rotating it resets the current day's counters.
+- Secret findings persist a SHA-256 fingerprint of the match, not prefix/suffix material or connection-string userinfo.
 - Anyone holding an unexpired report identifier can retrieve the report.
 - The browser keeps a local-only list of seen reports (ID, hostname, grade, counts, timestamps) in `localStorage`, capped at 24 entries and pruned on expiry; it never sends that list to the server and is cleared by the viewer at will.
 
@@ -158,7 +161,7 @@ Detected CMS versions remain fingerprint evidence. VulnScope does not grade a Wo
 - Forms are not submitted, credentials are not accepted, and destructive HTTP methods are not used.
 - Response bodies, request bodies, concurrency, elapsed time, and redirect depth are bounded.
 - Stored cookie values, URL secrets, query values, and fragments are removed.
-- Optional probes require explicit caller selection and appear in coverage.
+- Optional probes (sensitive paths, takeover, WordPress deep checks, TRACE) require explicit caller selection and appear in coverage.
 - The service remains open for limited testing and relies on bounded abuse controls rather than user ownership.
 
 See `THREAT_MODEL.md` for threats, controls, residual risk, and operational gates.

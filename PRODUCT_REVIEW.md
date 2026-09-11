@@ -1,3 +1,10 @@
+> **Status (2026-09-11):** This document is a historical review from 2026-08-14.
+> Subsequent work addressed the then-open criticals (C1 public-report secret
+> disclosure and C2 redirect/SSRF boundary) and many of the high/medium items
+> listed below. Do not treat "open criticals" in this snapshot as the current
+> product state. See [THREAT_MODEL.md](./THREAT_MODEL.md) and [README.md](./README.md)
+> for the live control set.
+
 # VulnScope product review
 
 Review date: 2026-08-14  

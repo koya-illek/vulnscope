@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { scanForSecrets } from "../src/secrets";
+import { scanForSecrets, hashSecretValue, MAX_SECRET_FINDINGS } from "../src/secrets";
 import type { SecretFinding } from "../src/types";
 
 describe("scanForSecrets", () => {
@@ -123,9 +123,7 @@ describe("scanForSecrets", () => {
     const results = await scanForSecrets(bundles);
     expect(results.length).toBe(1);
     expect(results[0].type).toBe("twilio-key");
-    // The loose SK+hex shape also occurs in minified code, so it is capped at
-    // high severity with medium confidence instead of forcing a grade of F.
-    expect(results[0].severity).toBe("high");
+    expect(results[0].severity).toBe("medium");
     expect(results[0].confidence).toBe("medium");
   });
 
@@ -139,8 +137,7 @@ describe("scanForSecrets", () => {
     const results = await scanForSecrets(bundles);
     expect(results.map((r) => r.type).sort()).toEqual(["jwt-token", "mailgun-key", "twilio-key"]);
     for (const finding of results) {
-      // No heuristic shape may claim critical severity or high confidence.
-      expect(["medium", "high"]).toContain(finding.severity);
+      expect(finding.severity).toBe("medium");
       expect(finding.confidence).toBe("medium");
     }
     const jwt = results.find((r) => r.type === "jwt-token");
@@ -179,20 +176,22 @@ describe("scanForSecrets", () => {
     expect(results[0].type).toBe("connection-string");
   });
 
-  it("detects generic API keys", async () => {
+  it("detects generic API keys at medium so they cannot force grade D or F", async () => {
     const content = 'const config = { api_key: "abcdefghijklmnop1234567890abcdefghij" };';
     const bundles = [{ url: "https://example.com/app.js", content }];
     const results = await scanForSecrets(bundles);
     expect(results.length).toBe(1);
     expect(results[0].type).toBe("generic-api-key");
+    expect(results[0].severity).toBe("medium");
   });
 
-  it("detects generic secrets", async () => {
+  it("detects generic secrets at medium so they cannot force grade D or F", async () => {
     const content = 'const secret = "mySecretValue1234567";';
     const bundles = [{ url: "https://example.com/app.js", content }];
     const results = await scanForSecrets(bundles);
     expect(results.length).toBe(1);
     expect(results[0].type).toBe("generic-secret");
+    expect(results[0].severity).toBe("medium");
   });
 
   it("detects Firebase configs", async () => {
@@ -226,18 +225,31 @@ describe("scanForSecrets", () => {
     expect(results[1].source).toBe("https://example.com/vendor.js");
   });
 
-  it("redacts secret values in snippets", async () => {
-    const content = 'const key = "AKIAIOSFODNN7EXAMPLE";';
+  it("stores a stable hash instead of prefix or suffix secret material", async () => {
+    const secret = "AKIAIOSFODNN7EXAMPLE";
+    const content = `const key = "${secret}";`;
+    const bundles = [{ url: "https://example.com/app.js?token=abc", content }];
+    const results = await scanForSecrets(bundles);
+    expect(results.length).toBe(1);
+    const finding = results[0];
+    expect(finding.hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(finding.hash).toBe(await hashSecretValue(secret));
+    expect(JSON.stringify(finding)).not.toContain(secret);
+    expect(JSON.stringify(finding)).not.toContain("AKIAIOSF");
+    expect(JSON.stringify(finding)).not.toContain("MPLE");
+    expect(finding).not.toHaveProperty("snippet");
+    expect(finding.source).toBe("https://example.com/app.js");
+  });
+
+  it("hashes connection-string userinfo instead of storing it", async () => {
+    const content = 'const dbUrl = "postgres://admin:secretpass@db.example.com:5432/mydb";';
     const bundles = [{ url: "https://example.com/app.js", content }];
     const results = await scanForSecrets(bundles);
     expect(results.length).toBe(1);
-    const snippet = results[0].snippet;
-    // Snippet should NOT contain the full secret
-    expect(snippet).not.toContain("AKIAIOSFODNN7EXAMPLE");
-    // Snippet should contain the beginning
-    expect(snippet).toContain("AKIA");
-    // Snippet should contain "..."
-    expect(snippet).toContain("...");
+    const serialized = JSON.stringify(results[0]);
+    expect(serialized).not.toContain("admin");
+    expect(serialized).not.toContain("secretpass");
+    expect(results[0].hash).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it("calculates approximate line numbers", async () => {
@@ -264,8 +276,18 @@ describe("scanForSecrets", () => {
     const finding: SecretFinding = results[0];
     expect(typeof finding.type).toBe("string");
     expect(["critical", "high"]).toContain(finding.severity);
-    expect(typeof finding.snippet).toBe("string");
+    expect(finding.hash).toMatch(/^[0-9a-f]{64}$/);
     expect(typeof finding.line).toBe("number");
     expect(typeof finding.source).toBe("string");
+    expect(finding).not.toHaveProperty("snippet");
+  });
+
+  it("caps the number of secret findings per scan", async () => {
+    const keys = Array.from({ length: MAX_SECRET_FINDINGS + 10 }, (_, i) =>
+      `api_key: "${"a".repeat(32)}${String(i).padStart(4, "0")}"`,
+    );
+    const bundles = [{ url: "https://example.com/app.js", content: keys.join("\n") }];
+    const results = await scanForSecrets(bundles);
+    expect(results.length).toBe(MAX_SECRET_FINDINGS);
   });
 });

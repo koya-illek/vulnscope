@@ -183,4 +183,48 @@ describe("analyzeUrl schema-v2 grading coverage", () => {
       report.findings.some((finding) => finding.category === "missing-header"),
     ).toBe(false);
   });
+
+  it("does not run WordPress deep checks or TRACE unless opted in", async () => {
+    vi.mocked(fingerprint).mockReturnValue({
+      result: { server: null, poweredBy: null, cms: { name: "WordPress", version: "6.5" }, framework: null, languages: ["PHP"] },
+      findings: [],
+    });
+
+    const report = await analyzeUrl("https://example.com", 7);
+
+    expect(scanWordPress).not.toHaveBeenCalled();
+    expect(report.coverage.wordpress).toMatchObject({
+      status: "skipped",
+      requested: false,
+    });
+    expect(report.coverage.wordpress.detail).toContain("not enabled");
+    expect(probeMethods).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.anything(),
+      { probeTrace: false },
+    );
+    expect(report.coverage.methods.detail).toContain("OPTIONS Allow reconnaissance");
+    expect(report.coverage.methods.detail).not.toContain("TRACE");
+  });
+
+  it("runs WordPress deep checks and TRACE when those options are enabled", async () => {
+    vi.mocked(fingerprint).mockReturnValue({
+      result: { server: null, poweredBy: null, cms: { name: "WordPress", version: "6.5" }, framework: null, languages: ["PHP"] },
+      findings: [],
+    });
+
+    await analyzeUrl("https://example.com", 7, {}, () => {}, {
+      probePaths: false,
+      checkTakeover: false,
+      checkWordPress: true,
+      probeTrace: true,
+    });
+
+    expect(scanWordPress).toHaveBeenCalled();
+    expect(probeMethods).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.anything(),
+      { probeTrace: true },
+    );
+  });
 });

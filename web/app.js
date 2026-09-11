@@ -25,6 +25,8 @@
   const authConfirm = $("#auth-confirm");
   const probePathsCheckbox = $("#probe-paths");
   const checkTakeoverCheckbox = $("#check-takeover");
+  const checkWordPressCheckbox = $("#check-wordpress");
+  const probeTraceCheckbox = $("#probe-trace");
   const progressPanel = $("#progress-panel");
   const errorPanel = $("#error-panel");
   const reportPanel = $("#report");
@@ -65,6 +67,8 @@
     scanButton.disabled = busy || !authorised;
     probePathsCheckbox.disabled = busy;
     checkTakeoverCheckbox.disabled = busy;
+    checkWordPressCheckbox.disabled = busy;
+    probeTraceCheckbox.disabled = busy;
     $("#scan-state").textContent = busy
       ? "Scan in progress."
       : authorised
@@ -195,7 +199,9 @@
         body: JSON.stringify({
           url: url.trim(),
           probePaths: probePathsCheckbox.checked,
-          checkTakeover: checkTakeoverCheckbox.checked
+          checkTakeover: checkTakeoverCheckbox.checked,
+          checkWordPress: checkWordPressCheckbox.checked,
+          probeTrace: probeTraceCheckbox.checked
         })
       });
       if (token !== runToken) {

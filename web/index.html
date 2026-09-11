@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Unauthenticated web vulnerability scanner. Check for exposed files, security headers, certificate evidence, CORS misconfigurations, and subdomain takeover risk.">
+  <meta name="description" content="Bounded unauthenticated external exposure scan. Check public files, security headers, certificate evidence, CORS, and optional takeover risk.">
   <meta name="theme-color" content="#07100e">
   <meta property="og:title" content="VulnScope: Find what's exposed">
-  <meta property="og:description" content="Unauthenticated web vulnerability scanner. Check for exposed files, security headers, certificate evidence, CORS misconfigurations, and subdomain takeover risk.">
+  <meta property="og:description" content="Bounded unauthenticated external exposure scan. Check public files, security headers, certificate evidence, CORS, and optional takeover risk.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://scan.illek.ie/">
   <meta property="og:image" content="https://scan.illek.ie/social-card.png">
@@ -25,10 +25,10 @@
   <script src="./scan-history.js" defer></script>
   <script src="./example-report.js" defer></script>
   <script src="./app.js" defer></script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"VulnScope","url":"https://scan.illek.ie/","description":"Run bounded unauthenticated public-site security checks with evidence-backed reports.","applicationCategory":"SecurityApplication","operatingSystem":"Any","browserRequirements":"Requires a modern web browser"}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"VulnScope","url":"https://scan.illek.ie/","description":"Run bounded unauthenticated public-site exposure checks with evidence-backed reports.","applicationCategory":"SecurityApplication","operatingSystem":"Any","browserRequirements":"Requires a modern web browser"}</script>
 </head>
 <body>
-  <a class="skip-link" href="#main-content">Skip to vulnerability scan</a>
+  <a class="skip-link" href="#main-content">Skip to exposure scan</a>
   <div class="grid-field" aria-hidden="true"></div>
   <header class="site-header">
     <a class="brand" href="./" aria-label="VulnScope home">
@@ -44,7 +44,7 @@
   <main id="main-content">
     <section class="hero" id="home">
       <h1>Find what's<br><em>exposed.</em></h1>
-      <p class="hero-copy">Unauthenticated scan for exposed files, security headers, certificate evidence, CORS misconfigurations, and subdomain takeover risk in one evidence-backed report.</p>
+      <p class="hero-copy">Unauthenticated external exposure scan for public files, security headers, certificate evidence, CORS, and optional takeover risk in one evidence-backed report.</p>
 
       <form class="trace-form" id="scan-form">
         <label for="url-input">Target URL</label>
@@ -71,6 +71,20 @@
             <span class="deps-toggle-text">
               <strong>Check subdomain takeover</strong>
               <small>Certificate Transparency · dangling CNAMEs. Uses bounded DNS and HTTP checks.</small>
+            </span>
+          </label>
+          <label class="deps-toggle">
+            <input type="checkbox" id="check-wordpress" name="checkWordPress">
+            <span class="deps-toggle-text">
+              <strong>WordPress deep checks</strong>
+              <small>REST users, xmlrpc, config backups, debug log. Extra requests; skipped if the site is not WordPress.</small>
+            </span>
+          </label>
+          <label class="deps-toggle">
+            <input type="checkbox" id="probe-trace" name="probeTrace">
+            <span class="deps-toggle-text">
+              <strong>Probe HTTP TRACE</strong>
+              <small>Optional Cross-Site Tracing check. Default scans only read the OPTIONS Allow header.</small>
             </span>
           </label>
         </fieldset>
@@ -283,7 +297,7 @@
 
   <footer>
     <a class="brand small" href="./"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>VulnScope</span></a>
-    <p>Independent web vulnerability scanning.</p>
+    <p>Independent external exposure scanning.</p>
     <p>© 2026 Illek. All rights reserved. Diagnostic guidance only. Not a substitute for penetration testing.</p>
     <a class="text-button" href="./openapi.yaml" type="application/yaml">Developer API</a>
     <a class="text-button" href="https://tools.illek.ie/privacy">Privacy</a>
@@ -302,7 +316,7 @@
       <article><span>CRS</span><div><h3>CORS misconfiguration test</h3><p>Tests whether the target returns permissive Access-Control headers that could enable cross-origin data theft.</p></div></article>
       <article><span>TKO</span><div><h3>Subdomain takeover check</h3><p>Uses Certificate Transparency subdomains to probe for dangling CNAME records pointing to claimable services.</p></div></article>
     </div>
-    <p class="dialog-footnote">VulnScope does not exploit vulnerabilities, submit forms, bypass authentication, or test for injection. All outbound target probes use GET, OPTIONS, or TRACE only; no other HTTP method is sent. HTTP method checks use OPTIONS advertisements and non-mutating TRACE reconnaissance. Use the report for defensive reconnaissance and evidence review.</p>
+    <p class="dialog-footnote">VulnScope does not exploit vulnerabilities, submit forms, bypass authentication, or test for injection. Default outbound probes use GET and OPTIONS. TRACE, WordPress deep checks, sensitive paths, and takeover checks are opt-in. No other HTTP method is sent. Use the report for defensive reconnaissance and evidence review.</p>
   </dialog>
 </body>
 </html>

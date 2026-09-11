@@ -53,13 +53,23 @@ function storedReportJson(hostname: string): string {
 function envWithRow(row: { report_json: string } | null): Env {
   return {
     DB: {
-      prepare: vi.fn(() => ({
-        bind: () => ({ first: async () => row }),
+      prepare: vi.fn((sql: string) => ({
+        bind: () => ({
+          first: async () => {
+            if (typeof sql === "string" && sql.includes("INSERT INTO rate_limits")) {
+              return { request_count: 1 };
+            }
+            return row;
+          },
+          run: async () => undefined,
+        }),
       })),
     },
     ASSETS: { fetch: async () => new Response("<html>asset</html>", { status: 200 }) },
     ALLOWED_ORIGINS: "",
     ENVIRONMENT: "test",
+    RATE_LIMIT_HMAC_KEY: "test-only-rate-limit-hmac-key-32-bytes",
+    REPORT_DAILY_LIMIT: "80",
   } as unknown as Env;
 }
 

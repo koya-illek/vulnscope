@@ -91,12 +91,12 @@
         },
         wordpress: {
           status: "skipped",
-          detail: "WordPress checks skipped because the target was not identified as WordPress or the main fetch failed.",
+          detail: "WordPress deep checks were not enabled for this scan.",
           requested: false,
         },
         methods: {
           status: "measured",
-          detail: "OPTIONS Allow and non-mutating TRACE reconnaissance completed.",
+          detail: "OPTIONS Allow reconnaissance completed.",
           requested: true,
         },
         takeover: {
