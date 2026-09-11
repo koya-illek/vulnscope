@@ -7,3 +7,9 @@ coverage/
 dist/
 **/dist/
 
+.env
+.env.*
+!.env.example
+.DS_Store
+.dev.vars
+api/.dev.vars
