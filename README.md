@@ -1,19 +1,24 @@
 # VulnScope
 
-An Illek project.
+Inspect a public website's external exposure. Review security headers, public
+files, certificate evidence and optional checks in a report that explains what ran.
 
-Bounded, unauthenticated reconnaissance of authorised public websites. It
-does not exploit vulnerabilities, submit forms, or bypass authentication.
+[Open VulnScope](https://vulnscope.illek.ie) · [More Illek tools](https://tools.illek.ie)
 
-Live at [vulnscope.illek.ie](https://vulnscope.illek.ie).
-[scan.illek.ie](https://scan.illek.ie) permanently redirects to the same
-service.
+![VulnScope interface showing the target URL, optional checks and permission confirmation](docs/assets/product-screenshot.png)
 
-<p align="center">
-  <img src="docs/assets/vulnscope-architecture.png" width="920" alt="VulnScope architecture: a caller hits the Cloudflare Worker, a safe outbound policy bounds recon of an authorised public site, and a redacted report is stored in D1">
-</p>
+*Live interface captured on 12 September 2026.*
 
-<p align="center"><sub>Conceptual infographic. The Worker, safe-outbound policy, probe budget, and D1 report contract in <a href="ARCHITECTURE.md">ARCHITECTURE.md</a> are the source of truth.</sub></p>
+## Try it
+
+Choose **View an example report** to explore the output. To inspect your own
+website, enter its public URL, select the checks you need, confirm permission,
+and choose **Run authorised scan**.
+
+Checks are bounded and unauthenticated. VulnScope does not exploit vulnerabilities,
+submit forms or bypass authentication. Skipped checks are not treated as passes.
+
+[scan.illek.ie](https://scan.illek.ie) redirects to the same service.
 
 ## How a scan runs
 
@@ -178,6 +183,12 @@ limited testing and relies on these bounds rather than caller authentication.
 - [THREAT_MODEL.md](THREAT_MODEL.md) — threats, controls, residual risk, and operational gates
 - Live OpenAPI: [vulnscope.illek.ie/openapi.yaml](https://vulnscope.illek.ie/openapi.yaml)
 - Live MCP connector: [vulnscope.illek.ie/mcp-copilot.yaml](https://vulnscope.illek.ie/mcp-copilot.yaml)
+
+## Feedback and contributions
+
+Found a problem? [Report a bug](https://github.com/koya-illek/vulnscope/issues/new?template=bug_report.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for fixes and feature proposals, or
+[SECURITY.md](SECURITY.md) to report a vulnerability.
 
 ## License
 
