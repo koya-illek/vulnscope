@@ -2,70 +2,65 @@
 
 An Illek project.
 
-VulnScope performs bounded, unauthenticated reconnaissance of authorised
-public websites without exploiting vulnerabilities, submitting forms, or
-bypassing authentication.
+Bounded, unauthenticated reconnaissance of authorised public websites. It
+does not exploit vulnerabilities, submit forms, or bypass authentication.
 
 Live at [vulnscope.illek.ie](https://vulnscope.illek.ie).
 [scan.illek.ie](https://scan.illek.ie) permanently redirects to the same
 service.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the complete component, data-flow,
-storage, probe-budget, deployment, and third-party service design.
+<p align="center">
+  <img src="docs/assets/vulnscope-architecture.png" width="920" alt="VulnScope architecture: a caller hits the Cloudflare Worker, a safe outbound policy bounds recon of an authorised public site, and a redacted report is stored in D1">
+</p>
 
-The public beta applies one outbound policy to the initial URL, redirects,
-scripts, WordPress checks, CORS probes, methods, and takeover evidence. A scan
-allows at most 46 outbound requests (32 on MCP), six concurrent outbound
-connections (four on MCP), a 25-second outbound-work deadline (15 seconds on
-MCP), and bounded response bodies. Sensitive path, takeover, WordPress deep
-checks, and TRACE probing are opt-in and report partial coverage when the safe
-budget is exhausted.
-Reports are opaque bearer links: anyone with the report ID can read an
-unexpired report, so share links only with approved reviewers. Reports expire
-after the configured retention period, are served with private no-store
-caching, and remove cookie values plus query and fragment components from
-stored URL evidence. Secret findings store a SHA-256 fingerprint of the
-match, never prefix, suffix, or connection-string userinfo. Read
-[THREAT_MODEL.md](./THREAT_MODEL.md) before operating a deployment.
+<p align="center"><sub>Conceptual infographic. The Worker, safe-outbound policy, probe budget, and D1 report contract in <a href="ARCHITECTURE.md">ARCHITECTURE.md</a> are the source of truth.</sub></p>
 
-Daily quota identifiers use a scope-specific HMAC and never store the source
-IP address. Before the first production deployment, generate a random secret
-of at least 32 bytes and store it with
-`cd api && npx wrangler secret put RATE_LIMIT_HMAC_KEY`. Do not put the
-production value in `wrangler.toml` or `.dev.vars`. A missing or short HMAC
-key fails closed with an operator-visible error. Validation failures and
-recent-scan cache hits are uncharged, recent-scan cache keys are scoped to
-the caller's daily quota identity, and a scan aborted by a VulnScope
-resolver outage is refunded so the invited retry is free.
+## How a scan runs
 
-MCP remains publicly usable for testing (no API key). The MCP daily scan
-quota defaults to 10, well below the web-form quota of 50, and is clamped to
-at most 20. Well-formed report reads share a separate daily cap (default 80);
-ETag revalidation is uncharged so polling agents are not exhausted.
+```mermaid
+flowchart LR
+    Caller["Browser, REST, or MCP"]
+    Worker["Cloudflare Worker"]
+    Policy["Validate, quota, and safe outbound"]
+    Target["Authorised public site"]
+    Evidence["DoH and crt.sh"]
+    D1[("D1 redacted report")]
 
-In the browser, VulnScope keeps a local-only list of the reports this browser
-has seen (ID, hostname, grade, timestamps) under the scan form, and a report
-can be diffed against an earlier same-host scan: grade transition, per-severity
-deltas, added and resolved findings. That list lives entirely in
-`localStorage` — the server stores no history relationship between reports.
-
-## Agent integrations
-
-```text
-GET  https://vulnscope.illek.ie/api/v2
-POST https://vulnscope.illek.ie/api/v2/scan
-POST https://vulnscope.illek.ie/mcp
-POST https://vulnscope.illek.ie/mcp/v2
+    Caller --> Worker --> Policy
+    Policy --> Target
+    Policy --> Evidence
+    Policy --> D1 --> Caller
 ```
 
-The MCP endpoints implement stateless JSON-RPC over HTTP, negotiate
-`2025-11-25` (echoing a client-pinned `2025-06-18` when requested), and
-publish `scan_website` plus `get_vulnscope_report`. REST scan progress uses
-newline-delimited JSON (`application/x-ndjson`). Copilot Studio can import
-`https://vulnscope.illek.ie/mcp-copilot.yaml`; OpenAPI agents can import
-`https://vulnscope.illek.ie/openapi.yaml`.
+The Worker applies one outbound policy to the initial URL, redirects,
+scripts, WordPress checks, CORS probes, methods, and takeover evidence. A
+scan allows at most **46 outbound requests** (32 on MCP), **six concurrent**
+outbound connections (four on MCP), a **25-second** outbound-work deadline
+(15 seconds on MCP), and bounded response bodies. Exhausted work is marked
+partial or skipped — the report does not treat unexecuted checks as passed.
 
-### Quickstart
+## What it checks
+
+**Always on:** public-target validation, security headers, cookies (names and
+flags only), supported methods, CORS, technology and public script signals,
+and certificate-transparency history.
+
+**Opt-in** (and reported as partial when the budget runs out): sensitive-path
+probes, subdomain-takeover evidence, WordPress deep checks, and TRACE.
+
+**Not in scope:** exploitability, authenticated coverage, CVE proof, port
+scans, form submission, credential collection, browser rendering, active TLS
+protocol or cipher tests, proof of takeover ownership, or a guarantee that a
+site is secure.
+
+In the browser, VulnScope keeps a local-only list of reports this browser
+has seen (ID, hostname, grade, timestamps) and can diff a report against an
+earlier same-host scan. That list lives in `localStorage`. The server stores
+no history relationship between reports.
+
+## Quickstart
+
+### Live API
 
 ```sh
 # Create a scan (201 with the full report; charges the daily web quota)
@@ -87,7 +82,53 @@ curl -sSOJ "https://vulnscope.illek.ie/api/scans/<reportId>/export?format=markdo
 curl -sS -o /dev/null -w '%{http_code}\n' \
   -H 'If-None-Match: "<etag-from-previous-response>"' \
   https://vulnscope.illek.ie/api/scans/<reportId>
+```
 
+### Local development
+
+From `api/`, copy `api/.dev.vars.example` to `api/.dev.vars`, then run
+`npx wrangler dev --local` and open `http://localhost:8788`. The session
+runs in the development environment via `api/.dev.vars`, which disables the
+production HTTP→HTTPS entry redirect that would otherwise loop forever under
+`wrangler dev`'s custom-domain emulation and allowlists the emulated origin
+so the page can call the API same-origin. The example file also supplies a
+dummy `RATE_LIMIT_HMAC_KEY` of at least 32 bytes. Keep the real
+`api/.dev.vars` file gitignored. Production values in `wrangler.toml` are
+unaffected.
+
+### Release checks
+
+From `api/`, run `npm run verify:release`. It covers TypeScript, unit and
+contract tests, browser JavaScript syntax, the dependency audit, and a
+Cloudflare deployment dry run. Repository CI runs the same command for every
+push and pull request.
+
+After deployment, run `npm run smoke:production`. It checks the public
+shell, security headers, health and API metadata, HTTP-to-HTTPS redirect,
+and MCP initialisation and CORS without creating a scan or writing a
+report. The separate `npm run smoke:production:scan` command creates a real
+target scan and stores a production report. Run that mutating check only
+with release-owner approval.
+
+## API and MCP
+
+```text
+GET  https://vulnscope.illek.ie/api/v2
+POST https://vulnscope.illek.ie/api/v2/scan
+POST https://vulnscope.illek.ie/mcp
+POST https://vulnscope.illek.ie/mcp/v2
+```
+
+The MCP endpoints implement stateless JSON-RPC over HTTP, negotiate
+`2025-11-25` (echoing a client-pinned `2025-06-18` when requested), and
+publish `scan_website` plus `get_vulnscope_report`. REST scan progress uses
+newline-delimited JSON (`application/x-ndjson`). Copilot Studio can import
+`https://vulnscope.illek.ie/mcp-copilot.yaml`; OpenAPI agents can import
+`https://vulnscope.illek.ie/openapi.yaml`.
+
+MCP remains publicly usable for testing (no API key).
+
+```sh
 # MCP: initialize, then call a tool (stateless; no session handshake needed)
 curl -sS -X POST https://vulnscope.illek.ie/mcp/v2 \
   -H 'Content-Type: application/json' \
@@ -97,30 +138,46 @@ curl -sS -X POST https://vulnscope.illek.ie/mcp/v2 \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"scan_website","arguments":{"url":"example.com"}}}'
 ```
 
-## Release checks
+## Security, privacy, and quotas
 
-From `api/`, run `npm run verify:release`. It covers TypeScript, unit and
-contract tests, browser JavaScript syntax, the dependency audit, and a
-Cloudflare deployment dry run. The repository CI runs the same command for
-every push and pull request.
+Read [THREAT_MODEL.md](./THREAT_MODEL.md) before operating a deployment.
 
-After deployment, run `npm run smoke:production`. It checks the public shell,
-security headers, health and API metadata, HTTP-to-HTTPS redirect, and MCP
-initialisation and CORS without creating a scan or writing a report. The
-separate `npm run smoke:production:scan` command creates a real target scan and
-stores a production report. Run that mutating check only with release-owner
-approval.
+Reports are **opaque bearer links**: anyone with the report ID can read an
+unexpired report, so share links only with approved reviewers. Reports
+expire after the configured retention period (14 days by default), are
+served with private no-store caching, and remove cookie values plus query
+and fragment components from stored URL evidence. Secret findings store a
+SHA-256 fingerprint of the match, never prefix, suffix, or connection-string
+userinfo.
 
-## Local development
+Daily quota identifiers use a scope-specific HMAC and never store the source
+IP address. Before the first production deployment, generate a random secret
+of at least 32 bytes and store it with
+`cd api && npx wrangler secret put RATE_LIMIT_HMAC_KEY`. Do not put the
+production value in `wrangler.toml` or `.dev.vars`. A missing or short HMAC
+key fails closed with an operator-visible error. Validation failures and
+recent-scan cache hits are uncharged, recent-scan cache keys are scoped to
+the caller's daily quota identity, and a scan aborted by a VulnScope
+resolver outage is refunded so the invited retry is free.
 
-From `api/`, copy `api/.dev.vars.example` to `api/.dev.vars`, then run
-`npx wrangler dev --local` and open `http://localhost:8788`. The session runs
-in the development environment via `api/.dev.vars`, which disables the
-production HTTP→HTTPS entry redirect that would otherwise loop forever under
-`wrangler dev`'s custom-domain emulation and allowlists the emulated origin so
-the page can call the API same-origin. The example file also supplies a dummy
-`RATE_LIMIT_HMAC_KEY` of at least 32 bytes. Keep the real `api/.dev.vars` file
-gitignored. Production values in `wrangler.toml` are unaffected.
+| Limit | Web / REST | MCP |
+| --- | --- | --- |
+| Outbound requests per scan | 46 | 32 |
+| Concurrent outbound connections | 6 | 4 |
+| Outbound-work deadline | 25 s | 15 s |
+| Daily scans | 50 | 10 (clamped at 20) |
+| Daily well-formed report reads | 80, shared with MCP; ETag revalidation uncharged | 80, shared with web |
+
+The MCP daily scan quota is well below the web-form quota so agents cannot
+exhaust a shared caller's browser allowance. The service stays open for
+limited testing and relies on these bounds rather than caller authentication.
+
+## Deeper docs
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) — components, data flow, probe budget, storage, and third-party services
+- [THREAT_MODEL.md](THREAT_MODEL.md) — threats, controls, residual risk, and operational gates
+- Live OpenAPI: [vulnscope.illek.ie/openapi.yaml](https://vulnscope.illek.ie/openapi.yaml)
+- Live MCP connector: [vulnscope.illek.ie/mcp-copilot.yaml](https://vulnscope.illek.ie/mcp-copilot.yaml)
 
 ## License
 
