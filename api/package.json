@@ -17,7 +17,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260823.1",
+    "@cloudflare/workers-types": "^5.20260923.1",
     "@redocly/cli": "^2.53.2",
     "typescript": "^5.9.2",
     "vitest": "^5.0.1",
