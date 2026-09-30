@@ -25,5 +25,8 @@
   },
   "dependencies": {
     "tldts": "^7.4.13"
+  },
+  "overrides": {
+    "undici": "7.30.0"
   }
 }
