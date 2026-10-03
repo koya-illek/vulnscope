@@ -24,7 +24,7 @@
     "wrangler": "^4.141.0"
   },
   "dependencies": {
-    "tldts": "^7.4.13"
+    "tldts": "^7.4.16"
   },
   "overrides": {
     "undici": "7.30.0"
