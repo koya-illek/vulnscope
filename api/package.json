@@ -9,7 +9,7 @@
     "check:openapi": "redocly lint ../web/openapi.yaml ../web/mcp-copilot.yaml",
     "check:web": "node --check ../web/app.js && node --check ../web/report-view.js && node --check ../web/stream-reader.js && node --check ../web/example-report.js && node --check ../web/scan-history.js",
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "deploy": "node scripts/deploy.mjs",
     "verify:release": "npm run check && npm audit --audit-level=low && wrangler deploy --dry-run --outdir ../dist/wrangler-dry-run",
     "smoke:production": "node scripts/production-smoke.mjs",
     "smoke:production:scan": "node scripts/production-scan-smoke.mjs",

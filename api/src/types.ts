@@ -322,6 +322,8 @@ export interface MethodResult {
 // ─── Env ───────────────────────────────────────────────────────────────────
 
 export interface Env {
+  SOURCE_REVISION?: string;
+  VERSION_METADATA?: { id: string; tag?: string; timestamp?: string };
   DB: D1Database;
   ASSETS: Fetcher;
   ALLOWED_ORIGINS: string;

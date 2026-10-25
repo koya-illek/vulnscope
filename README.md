@@ -195,3 +195,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for fixes and feature proposals, or
 MIT © Koya Illek. See [LICENSE](LICENSE).
 
 Live service: [vulnscope.illek.ie](https://vulnscope.illek.ie).
+
+### Release identity
+
+`GET /api/health` reports process liveness only, not database connectivity, provider freshness or scan coverage. `sourceRevision` is supplied by `npm run deploy` from a clean Git tree; `deploymentId` comes from Cloudflare version metadata. Local or directly deployed builds without revision metadata report `unknown`. Use the maintained deploy script to preserve release provenance.
