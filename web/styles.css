@@ -394,7 +394,7 @@ input:focus-visible,
 
 
 .report-header { display: flex; justify-content: space-between; gap: 30px; align-items: end; border-bottom: 1px solid var(--line); padding-bottom: 34px; }
-.report-header h2 { margin: 0 0 8px; font-size: clamp(32px, 5vw, 54px); letter-spacing: -.05em; }
+#report-host { margin: 0 0 8px; font-size: clamp(32px, 5vw, 54px); letter-spacing: -.05em; }
 .example-badge {
   display: inline-block;
   margin-bottom: 10px;
@@ -470,7 +470,7 @@ input:focus-visible,
 .section-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
 .section-heading > div, .panel-header > div { display: flex; align-items: center; gap: 14px; }
 .section-number { color: var(--accent); font: 500 10px/1 var(--mono); }
-.section-heading h3, .panel-header h3 { margin: 0; font-size: 18px; }
+.section-heading :is(h2,h3), .panel-header :is(h2,h3) { margin: 0; font-size: 18px; }
 .section-heading p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
 .evidence-badge { padding: 6px 8px; border: 1px solid var(--line); color: var(--muted-2); font: 500 9px/1 var(--mono); letter-spacing: .1em; }
 
@@ -517,7 +517,7 @@ input:focus-visible,
   color: var(--muted);
 }
 .finding-body { min-width: 0; }
-.finding-body h4 { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
+.finding-body :is(h3,h4) { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
 .finding-body p { margin: 0 0 10px; color: var(--muted); font-size: 12px; line-height: 1.65; }
 .finding-evidence {
   display: block;

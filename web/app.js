@@ -326,7 +326,8 @@
     state.progressStep = 5;
     updateProgressSteps();
     $("#progress-track").value = 100;
-    setTimeout(() => progressPanel.classList.add("hidden"), 250);
+    const token=runToken;
+    setTimeout(() => {if(token===runToken)progressPanel.classList.add("hidden")}, 250);
   }
 
   function stopProgress() {
@@ -373,7 +374,13 @@
 
   // ─── Report rendering ─────────────────────────────────────────────
 
+  function reportHeading(level){
+    const old=$("#report-host");if(old.tagName===`H${level}`)return;
+    const title=document.createElement(`h${level}`);title.id=old.id;title.tabIndex=-1;title.textContent=old.textContent;old.replaceWith(title);
+    document.querySelectorAll("#report .section-heading h3, #report .panel-header h3").forEach(old=>{if(level!==1)return;const heading=document.createElement("h2");heading.innerHTML=old.innerHTML;heading.id=old.id;old.replaceWith(heading)});
+  }
   function displayReport(report, updateLocation, { example = false } = {}) {
+    reportHeading(1);
     state.report = report;
     state.isExample = example;
     // Any in-flight comparison belongs to a report that is no longer on
@@ -449,7 +456,9 @@
     reportPanel.classList.remove("hidden");
     if (updateLocation) history.pushState({ reportId: report.id }, "", `#${report.id}`);
     document.title = example ? "Example report: VulnScope" : `${report.hostname}: VulnScope`;
+    const displayedToken=runToken;
     setTimeout(() => {
+      if(displayedToken!==runToken||state.report?.id!==report.id)return;
       scrollToElement(reportPanel, "start");
       // The view swap is announced by the live regions, but keyboard and
       // screen-reader focus still needs to land on the new context.
@@ -549,7 +558,9 @@
       </div>
       ${findingList("New findings", comparison.added, "added")}
       ${findingList("Resolved findings", comparison.resolved, "resolved")}
-      <p class="comparison-note">Findings are matched by their stable IDs; counts come from each report's own summary.</p>`;
+      ${findingList("Not rechecked / coverage not comparable", comparison.notRechecked, "unknown")}
+      ${findingList("Changed evidence or severity", comparison.changed, "changed")}
+      <p class="comparison-note">Resolved requires matching targets and successfully rechecked coverage. Counts describe each report, not proof of remediation.</p>`;
     panel.querySelector(".comparison-close").addEventListener("click", () => {
       panel.classList.add("hidden");
       $("#report-host").focus({ preventScroll: true });
@@ -650,7 +661,7 @@
           <span class="finding-category">${escapeHtml(f.category || "")}</span>
         </div>
         <div class="finding-body">
-          <h4>${escapeHtml(f.title)}</h4>
+          <h3>${escapeHtml(f.title)}</h3>
           <p>${escapeHtml(f.detail)}</p>
           ${f.evidence ? `<pre class="finding-evidence">${escapeHtml(f.evidence)}</pre>` : ""}
           ${f.recommendation ? `<div class="finding-recommendation"><strong>Fix</strong><span>${escapeHtml(f.recommendation)}</span></div>` : ""}
@@ -884,6 +895,7 @@
   }
 
   function reset({ replaceHistory = false } = {}) {
+    reportHeading(2);
     runToken++;
     // Tear down any in-flight scan or report fetch owned by the abandoned
     // run; its completions are already invalidated by the token bump.
@@ -942,6 +954,9 @@
 
   window.addEventListener("popstate", () => {
     const id = location.hash.slice(1);
+    if(id==="example"||REPORT_ID_SHAPE.test(id)||!id){
+      runToken++;activeAbort?.abort();activeAbort=null;busy=false;stopProgress();updateScanAvailability();
+    }
     if (id === "example") {
       if (!busy && !state.isExample) showExample();
       return;
@@ -953,6 +968,6 @@
     // Back/Forward returned to a hashless entry while a report is on screen:
     // restore the landing view so the page matches the URL. Anchor jumps such
     // as #status intentionally keep the current view.
-    if (location.hash === "" && state.report) reset({ replaceHistory: true });
+    if (location.hash === "") reset({ replaceHistory: true });
   });
 })();

@@ -229,6 +229,7 @@ export interface SubdomainTakeoverCheck {
 
 export interface ScanReport {
   schemaVersion: 2;
+  scanOptions?: { probePaths:boolean;checkTakeover:boolean;checkWordPress:boolean;probeTrace:boolean;maxPaths:number|null };
   id: string;
   requestedUrl: string;
   hostname: string;
