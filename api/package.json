@@ -21,13 +21,12 @@
     "@redocly/cli": "^2.61.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3",
-    "wrangler": "^4.150.0"
+    "wrangler": "^4.162.0"
   },
   "dependencies": {
     "tldts": "^7.4.16"
   },
   "overrides": {
-    "sharp": "0.35.5",
-    "undici": "7.30.0"
+    "sharp": "0.35.5"
   }
 }
