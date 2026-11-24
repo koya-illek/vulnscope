@@ -95,7 +95,7 @@
     }
 
     function sortNewestFirst(list) {
-      return [...list].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+      return list.toSorted((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
     }
 
     function clear() {

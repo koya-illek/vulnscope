@@ -24,6 +24,7 @@
   <script src="./report-view.js" defer></script>
   <script src="./scan-history.js" defer></script>
   <script src="./example-report.js" defer></script>
+  <script src="./dialog-dismiss.js" defer></script>
   <script src="./app.js" defer></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"VulnScope","url":"https://vulnscope.illek.ie/","description":"Run bounded unauthenticated public-site exposure checks with evidence-backed reports.","applicationCategory":"SecurityApplication","operatingSystem":"Any","browserRequirements":"Requires a modern web browser"}</script>
 </head>
@@ -315,7 +316,7 @@
     <button class="text-button" id="footer-method-button" type="button">How scanning works</button>
   </footer>
 
-  <dialog id="method-dialog" aria-labelledby="method-dialog-title" aria-describedby="method-dialog-description">
+  <dialog closedby="any" id="method-dialog" aria-labelledby="method-dialog-title" aria-describedby="method-dialog-description">
     <button class="dialog-close" id="dialog-close" type="button" aria-label="Close">×</button>
     <h2 id="method-dialog-title">What VulnScope scans</h2>
     <p id="method-dialog-description" class="dialog-description">A bounded external observation. No credentials, exploit payloads, form submissions, or destructive methods are used.</p>

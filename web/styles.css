@@ -999,3 +999,5 @@ body:has(#report:not(.hidden)) #recent-scans { display:none; }
 }
 
 @media (max-width: 360px) { .grade-section .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+dialog:modal{overscroll-behavior:contain}dialog::backdrop{overflow:hidden;overscroll-behavior:contain}
