@@ -56,3 +56,6 @@ database_id = "790d7b81-47a9-4ec7-b9a8-cd6323610183"
 [observability]
 enabled = true
 head_sampling_rate = 1
+
+[version_metadata]
+binding = "VERSION_METADATA"

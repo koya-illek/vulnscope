@@ -283,6 +283,7 @@ async function main() {
         return {
           reportVisible: visible("#report"),
           exampleBadgeVisible: visible("#example-badge"),
+          emailHandoffVisible: visible("#email-handoff"),
           reportHost: document.querySelector("#report-host")?.textContent ?? null,
           findingCount: findings ? findings.childElementCount : -1,
           findingWidths: [...document.querySelectorAll(".finding-body")].map(node => node.getBoundingClientRect().width),
@@ -296,11 +297,107 @@ async function main() {
     const state = probe.result.value;
 
     if (!state.reportVisible) problems.push("#report stayed hidden; the example report did not render.");
+    if (state.emailHandoffVisible) problems.push("Sample report exposed a diagnostic handoff.");
     if (!state.exampleBadgeVisible) problems.push("#example-badge stayed hidden; the SAMPLE DATA marker did not render.");
     if (state.reportHost !== "shop.example") problems.push(`#report-host was ${JSON.stringify(state.reportHost)}, expected "shop.example".`);
     if (!(state.findingCount > 0)) problems.push(`#findings-list rendered ${state.findingCount} sections, expected at least one.`);
     if (state.findingWidths.some(width => width < 200)) problems.push("Mobile finding text has less than 200px of readable width.");
     if (state.title !== "Example report: VulnScope") problems.push(`document.title was ${JSON.stringify(state.title)}, expected "Example report: VulnScope".`);
+    // Exercise the real export button with local synthetic HTTP responses.
+    // No scan, provider request, saved report, or external navigation is used.
+    const exportProbe = await devtools.send("Runtime.evaluate", {
+      awaitPromise: true,
+      returnByValue: true,
+      expression: `(async () => {
+        const failures = [];
+        const check = (ok, message) => { if (!ok) failures.push(message); };
+        const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+        const fixture = { ...window.VulnScopeExample.report(), id: "abcdefghijklmnop" };
+        const originalFetch = window.fetch;
+        const originalClick = HTMLAnchorElement.prototype.click;
+        const originalCreate = URL.createObjectURL;
+        const originalTimeout = window.setTimeout;
+        const downloads = [];
+        const blobs = [];
+        let mode = "expired";
+        let release;
+        let started;
+        window.fetch = async (url, options) => {
+          if (String(url).includes("/export?")) {
+            if (mode === "network") throw new TypeError("Failed to fetch");
+            if (mode === "held") {
+              started?.();
+              await new Promise(resolve => { release = resolve; });
+            }
+            if (mode === "timeout") return new Promise((resolve, reject) => options.signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))));
+            if (mode === "expired") return new Response(JSON.stringify({ error: "Report not found or expired" }), { status: 404 });
+            if (mode === "nonjson") return new Response("Unavailable", { status: 503 });
+            return new Response("# Synthetic exported evidence", { headers: { "Content-Type": "text/markdown" } });
+          }
+          if (String(url).includes("/api/scans/")) return new Response(JSON.stringify(fixture), { headers: { "Content-Type": "application/json" } });
+          return originalFetch(url, options);
+        };
+        URL.createObjectURL = blob => { blobs.push(blob); return originalCreate.call(URL, blob); };
+        HTMLAnchorElement.prototype.click = function () {
+          if (this.download) downloads.push(this.download);
+          else originalClick.call(this);
+        };
+        window.setTimeout = (callback, ms, ...args) => originalTimeout(callback, ms === 45000 ? 20 : ms, ...args);
+        try {
+          history.pushState(null, "", "#abcdefghijklmnop");
+          dispatchEvent(new PopStateEvent("popstate"));
+          for (let n = 0; n < 100 && document.querySelector("#export-markdown").classList.contains("hidden"); n++) await wait(10);
+          const button = document.querySelector("#export-markdown");
+          check(!button.classList.contains("hidden"), "Real report did not expose Markdown export");
+          const handoff = document.querySelector("#email-handoff-link");
+          check(handoff.href === "https://email.illek.ie/#domain=shop.example", "Handoff must contain only the hostname in a fragment");
+          check(handoff.rel === "noreferrer", "Handoff must suppress the referring report URL");
+          check(!document.querySelector("#email-handoff").classList.contains("hidden"), "Real public hostname did not expose the handoff");
+          for (const [responseMode, expected] of [["expired", "Report not found or expired"], ["nonjson", "HTTP 503"], ["network", "connection"], ["timeout", "timed out"]]) {
+            mode = responseMode;
+            button.click();
+            for (let n = 0; n < 100 && button.disabled; n++) await wait(10);
+            check(document.querySelector("#error-code").textContent === "EXPORT_FAILED", responseMode + " missing export-specific badge");
+            check(document.querySelector("#error-message").textContent.includes(expected), responseMode + " missing actionable error");
+            check(!button.disabled, responseMode + " did not release export button");
+            check(downloads.length === 0, responseMode + " downloaded an error body");
+          }
+          mode = "success";
+          button.click();
+          for (let n = 0; n < 100 && button.disabled; n++) await wait(10);
+          check(downloads[0] === "vulnscope-shop.example-abcdefghijklmnop.md", "Successful export filename mismatch");
+          check(await blobs[0]?.text() === "# Synthetic exported evidence", "Successful export body mismatch");
+          check(document.querySelector("#error-panel").classList.contains("hidden"), "Successful retry retained an export error");
+          mode = "held";
+          const didStart = new Promise(resolve => { started = resolve; });
+          button.click();
+          await didStart;
+          check(button.disabled, "Pending export did not prevent duplicate activation");
+          document.querySelector("#new-scan").click();
+          release();
+          await wait(40);
+          check(downloads.length === 1, "Abandoned export downloaded old evidence");
+          check(document.querySelector("#error-panel").classList.contains("hidden"), "Abandoned export replaced destination with an error");
+          check(!button.disabled && button.textContent === "Export Markdown", "Abandoned export did not reset its control");
+          for (const hostname of ["192.0.2.1", "router.local", "user@example.com", "example.com/private", "broken.example-"]) {
+            fixture.hostname = hostname;
+            history.pushState(null, "", "#abcdefghijklmnop");
+            dispatchEvent(new PopStateEvent("popstate"));
+            for (let n = 0; n < 100 && document.querySelector("#report").classList.contains("hidden"); n++) await wait(10);
+            check(document.querySelector("#email-handoff").classList.contains("hidden"), "Unsafe hostname exposed handoff: " + hostname);
+            document.querySelector("#new-scan").click();
+          }
+        } finally {
+          window.fetch = originalFetch;
+          HTMLAnchorElement.prototype.click = originalClick;
+          URL.createObjectURL = originalCreate;
+          window.setTimeout = originalTimeout;
+        }
+        return failures;
+      })()`,
+    });
+    if (exportProbe.exceptionDetails) problems.push("Export probe failed: " + describeException(exportProbe.exceptionDetails));
+    for (const failure of exportProbe.result.value || []) problems.push(failure);
     for (const exception of uncaught) problems.push(`Uncaught page exception: ${exception}`);
     for (const error of consoleErrors) problems.push(`Console error: ${error}`);
 

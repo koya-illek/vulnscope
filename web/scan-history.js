@@ -139,6 +139,20 @@
     const currentFindings = Array.isArray(current.findings) ? current.findings : [];
     const previousFindings = Array.isArray(previous.findings) ? previous.findings : [];
     const currentIds = new Set(currentFindings.map((finding) => finding.id));
+    const phaseByCategory={"exposed-path":"paths","missing-header":"headers","weak-tls":"tlsProtocolCipher",cors:"cors",cookie:"cookies",takeover:"takeover",fingerprint:"mainFetch","information-disclosure":"mainFetch",secret:"secrets",wordpress:"wordpress",method:"methods"};
+    const sameTarget=typeof previous.requestedUrl==="string"&&previous.requestedUrl===current.requestedUrl;
+    const phases=Object.keys(current.coverage||{}).filter(key=>key!=="criticalGaps");
+    const sameOptions=previous.scanOptions&&current.scanOptions&&["probePaths","checkTakeover","checkWordPress","probeTrace","maxPaths"].every(key=>previous.scanOptions[key]===current.scanOptions[key])&&phases.length>0&&phases.every(key=>previous.coverage?.[key]?.requested===current.coverage?.[key]?.requested);
+    const rechecked=finding=>{
+      const key=phaseByCategory[finding.category];
+      const before=previous.coverage?.[key],after=current.coverage?.[key];
+      return sameTarget&&sameOptions&&key&&before?.status==="measured"&&after?.status==="measured"&&!after.truncated&&!after.failed&&!after.skipped&&(after.succeeded??0)>=(before.succeeded??0)&&current.status!=="failed";
+    };
+    const missing=previousFindings.filter(finding=>!currentIds.has(finding.id));
+    const changed=currentFindings.filter(finding=>{
+      const old=previousFindings.find(item=>item.id===finding.id);
+      return old&&["severity","evidence","detail"].some(key=>old[key]!==finding[key]);
+    });
     return {
       previousId: previous.id,
       currentId: current.id,
@@ -151,7 +165,9 @@
         to: countSeverity(currentFindings, severity),
       })),
       added: currentFindings.filter((finding) => !previousIds.has(finding.id)),
-      resolved: previousFindings.filter((finding) => !currentIds.has(finding.id)),
+      resolved: missing.filter(rechecked),
+      notRechecked: missing.filter(finding=>!rechecked(finding)),
+      changed,
     };
   }
 

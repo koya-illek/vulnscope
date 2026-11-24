@@ -375,6 +375,7 @@ export async function analyzeUrl(
 
   return {
     schemaVersion: 2,
+    scanOptions:{probePaths:options.probePaths,checkTakeover:options.checkTakeover,checkWordPress:options.checkWordPress===true,probeTrace:options.probeTrace===true,maxPaths:options.maxPaths??null},
     id,
     requestedUrl: redactUrlForStorage(initial.toString()),
     hostname: initial.hostname,
@@ -656,8 +657,8 @@ async function extractJsBundles(
 // ─── Convert new module results to Findings ─────────────────────────────────
 
 function secretFindingsAsFindings(secrets: SecretFinding[]): Finding[] {
-  return secrets.map((s, i) => ({
-    id: `secret-${s.type}-${i}`,
+  return secrets.map((s) => ({
+    id: `secret-${s.type}-${s.hash}-${encodeURIComponent(s.source)}`,
     severity: s.severity,
     category: "secret" as const,
     title: `Exposed ${s.type} in JavaScript`,
