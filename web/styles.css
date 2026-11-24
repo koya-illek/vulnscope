@@ -925,7 +925,8 @@ dialog h2 { margin: 0 0 30px; font-size: 32px; letter-spacing: -.04em; }
 @media screen and (max-width: 620px) {
   .hero { padding-top: 28px; padding-bottom: 20px; }
   .hero h1 { font-size: 36px; }
-  .hero-copy { font-size: 15px; line-height: 1.5; }
+  .hero-copy { margin-top: 16px; margin-bottom: 16px; font-size: 15px; line-height: 1.5; }
+  .example-hint { margin: 16px 0 24px; }
   .capability-strip, .site-header .status-link { display: none; }
   .site-header nav { gap: 12px; }
 }
