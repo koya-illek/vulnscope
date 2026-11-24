@@ -151,6 +151,9 @@ export default {
           version: API_VERSION,
           environment: env.ENVIRONMENT,
           protection: "rate-limit",
+          sourceRevision: env.SOURCE_REVISION || "unknown",
+          deploymentId: env.VERSION_METADATA?.id || "unknown",
+          healthScope: "process-liveness; does not check database, providers, or scan coverage",
           time: new Date().toISOString(),
         }, 200, cors);
       }

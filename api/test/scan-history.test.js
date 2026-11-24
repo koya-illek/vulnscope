@@ -40,6 +40,7 @@ function makeReport(overrides = {}) {
   const summary = overrides.summary || { grade: "B", critical: 0, high: 1, medium: 2, low: 0, info: 3 };
   return {
     schemaVersion: 2,
+    scanOptions:{probePaths:true,checkTakeover:true,checkWordPress:false,probeTrace:false,maxPaths:null},
     id: "abcd1234abcd1234",
     requestedUrl: "https://shop.example/",
     hostname: "shop.example",
@@ -47,6 +48,7 @@ function makeReport(overrides = {}) {
     createdAt: "2026-08-24T10:00:00.000Z",
     expiresAt: "2026-09-07T10:00:00.000Z",
     summary,
+    coverage: {headers:{status:"measured",requested:true},cors:{status:"measured",requested:true}},
     findings: [],
     ...overrides,
     summary,
@@ -153,9 +155,9 @@ describe("VulnScope report comparison", () => {
       id: "1111111111111111",
       summary: { grade: "C", critical: 0, high: 2, medium: 1, low: 0, info: 0 },
       findings: [
-        { id: "F1", severity: "high", title: "Missing HSTS", detail: "", evidence: "", recommendation: "" },
+        { id: "F1", category:"missing-header", severity: "high", title: "Missing HSTS", detail: "", evidence: "", recommendation: "" },
         { id: "F2", severity: "medium", title: "Old server banner", detail: "", evidence: "", recommendation: "" },
-        { id: "F3", severity: "high", title: "Open CORS reflection", detail: "", evidence: "", recommendation: "" },
+        { id: "F3", category:"cors", severity: "high", title: "Open CORS reflection", detail: "", evidence: "", recommendation: "" },
       ],
     });
     const current = makeReport({
@@ -194,5 +196,22 @@ describe("VulnScope report comparison", () => {
     expect(formatRelative("2026-08-24T07:00:00.000Z", NOW)).toBe("5 h ago");
     expect(formatRelative("2026-08-21T12:00:00.000Z", NOW)).toBe("3 d ago");
     expect(formatRelative("not-a-date", NOW)).toBe("");
+  });
+});
+
+
+describe("coverage-aware comparisons",()=>{
+  it("does not resolve skipped checks, changed targets or unknown legacy coverage",async()=>{
+    const {compareReports}=await importScanHistory();
+    const previous=makeReport({findings:[{id:"path",category:"exposed-path",severity:"critical"}],coverage:{paths:{status:"measured",requested:true}}});
+    for(const current of [makeReport({coverage:{paths:{status:"skipped",requested:false}}}),makeReport({requestedUrl:"https://shop.example/other",coverage:{paths:{status:"measured",requested:true}}}),makeReport({coverage:undefined})]){
+      const result=compareReports(previous,current);expect(result.resolved).toEqual([]);expect(result.notRechecked.map(f=>f.id)).toEqual(["path"]);
+    }
+    expect(compareReports(previous,makeReport({coverage:{paths:{status:"measured",requested:true}}})).resolved.map(f=>f.id)).toEqual(["path"]);
+  });
+  it("reports changed severity and evidence for stable identities",async()=>{
+    const {compareReports}=await importScanHistory();
+    const result=compareReports(makeReport({findings:[{id:"stable",severity:"low",evidence:"a"}]}),makeReport({findings:[{id:"stable",severity:"high",evidence:"b"}]}));
+    expect(result.changed.map(f=>f.id)).toEqual(["stable"]);expect(result.added).toEqual([]);
   });
 });

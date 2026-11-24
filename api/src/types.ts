@@ -229,6 +229,7 @@ export interface SubdomainTakeoverCheck {
 
 export interface ScanReport {
   schemaVersion: 2;
+  scanOptions?: { probePaths:boolean;checkTakeover:boolean;checkWordPress:boolean;probeTrace:boolean;maxPaths:number|null };
   id: string;
   requestedUrl: string;
   hostname: string;
@@ -322,6 +323,8 @@ export interface MethodResult {
 // ─── Env ───────────────────────────────────────────────────────────────────
 
 export interface Env {
+  SOURCE_REVISION?: string;
+  VERSION_METADATA?: { id: string; tag?: string; timestamp?: string };
   DB: D1Database;
   ASSETS: Fetcher;
   ALLOWED_ORIGINS: string;

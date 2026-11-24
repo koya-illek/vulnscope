@@ -227,4 +227,16 @@ describe("analyzeUrl schema-v2 grading coverage", () => {
       { probeTrace: true },
     );
   });
+  it("keeps secret identity stable across reordering but changes it for replacement fingerprints",async()=>{
+    const secret={type:"synthetic",severity:"medium" as const,hash:"redacted-fingerprint-a",line:1,source:"https://example.com/app.js"};
+    vi.mocked(scanForSecrets).mockResolvedValue([secret]);
+    const a=await analyzeUrl("https://example.com",7);
+    vi.mocked(scanForSecrets).mockResolvedValue([{...secret,hash:"redacted-fingerprint-b"},{...secret,line:999}]);
+    const b=await analyzeUrl("https://example.com",7);
+    const id=a.findings.find(f=>f.category==="secret")!.id;
+    const findings=b.findings.filter(f=>f.category==="secret");
+    expect(findings[1]!.id).toBe(id);expect(findings[0]!.id).not.toBe(id);
+    expect(a.scanOptions).toEqual(b.scanOptions);
+  });
+
 });

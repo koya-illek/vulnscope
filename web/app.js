@@ -14,6 +14,7 @@
   let busy = false;
   let runToken = 0;
   let activeAbort = null;
+  let markdownAbort = null;
   const OBSERVATION_NOTE_SUFFIX = "VulnScope performs unauthenticated checks only. It does not attempt exploitation, submit forms, or bypass authentication. Findings reflect what an external observer can discover without credentials.";
   // Server-side report IDs are exactly 16 URL-safe characters; the same shape
   // gate applies to local history entries before they trigger fetches.
@@ -175,12 +176,15 @@
     } catch {
       // Fall through to the generic status message.
     }
-    return new Error(`Scan failed with HTTP ${response.status}`);
+    return new Error(response.status >= 500
+      ? `The scanning service is temporarily unavailable. Try Run authorised scan again in a moment. Your target and options are unchanged. (HTTP ${response.status})`
+      : `Scan failed with HTTP ${response.status}. Check your target and try again.`);
   }
 
   async function runScan(url) {
     if (!url.trim() || busy) return;
     busy = true;
+    cancelMarkdownExport();
     const token = ++runToken;
     // Cancelling the controller (Cancel button, "New scan", Back) aborts the
     // fetch and its stream so an abandoned run stops downloading instead of
@@ -230,6 +234,7 @@
   async function loadReport(id, { trackHistory = false } = {}) {
     if (busy) return;
     busy = true;
+    cancelMarkdownExport();
     const token = ++runToken;
     const abort = new AbortController();
     activeAbort = abort;
@@ -326,7 +331,8 @@
     state.progressStep = 5;
     updateProgressSteps();
     $("#progress-track").value = 100;
-    setTimeout(() => progressPanel.classList.add("hidden"), 250);
+    const token=runToken;
+    setTimeout(() => {if(token===runToken)progressPanel.classList.add("hidden")}, 250);
   }
 
   function stopProgress() {
@@ -340,6 +346,7 @@
     const headings = {
       SCAN_FAILED: "The scan could not be completed",
       LOAD_FAILED: "That report could not be loaded",
+      EXPORT_FAILED: "The report could not be exported",
     };
     $("#error-code").textContent = badge;
     $("#error-heading").textContent = headings[badge] || headings.SCAN_FAILED;
@@ -373,7 +380,14 @@
 
   // ─── Report rendering ─────────────────────────────────────────────
 
+  function reportHeading(level){
+    const old=$("#report-host");if(old.tagName===`H${level}`)return;
+    const title=document.createElement(`h${level}`);title.id=old.id;title.tabIndex=-1;title.textContent=old.textContent;old.replaceWith(title);
+    document.querySelectorAll("#report .section-heading h3, #report .panel-header h3").forEach(old=>{if(level!==1)return;const heading=document.createElement("h2");heading.innerHTML=old.innerHTML;heading.id=old.id;old.replaceWith(heading)});
+  }
   function displayReport(report, updateLocation, { example = false } = {}) {
+    cancelMarkdownExport();
+    reportHeading(1);
     state.report = report;
     state.isExample = example;
     // Any in-flight comparison belongs to a report that is no longer on
@@ -400,6 +414,13 @@
       $("#example-badge").classList.add("hidden");
       ["#copy-link", "#export-json", "#export-markdown", "#new-scan"].forEach((selector) => $(selector).classList.remove("hidden"));
     }
+    // Fragment-only handoff: no paths, queries, bearer IDs, or evidence leave
+    // this report, and the destination never automatically starts analysis.
+    const hostname = String(report.hostname || "").toLowerCase();
+    const publicHostname = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])$/.test(hostname)
+      && !/\.(?:local|internal|localhost|lan|home|arpa)$/.test(hostname);
+    $("#email-handoff").classList.toggle("hidden", example || !publicHostname);
+    $("#email-handoff-link").href = publicHostname ? `https://email.illek.ie/#domain=${encodeURIComponent(hostname)}` : "https://email.illek.ie/";
     updateCompareButton(report, example);
     const requestedUrl = report.requestedUrl || report.url || `https://${report.hostname}`;
     const targetLink = $("#report-url");
@@ -418,7 +439,8 @@
     const budget = outbound
       ? ` · ${outbound.requestsAttempted}/${outbound.maxSubrequests} outbound requests · ${outbound.bodyBytes || 0} bytes${outbound.truncatedBodies ? ` · ${outbound.truncatedBodies} body limit${outbound.truncatedBodies === 1 ? "" : "s"}` : ""}`
       : "";
-    $("#report-meta").textContent = `${example ? "Sample data · " : ""}Report ${report.id || "unknown"} · ${report.status || "unknown"} · created ${created} · expires ${expires}${budget}`;
+    $("#report-meta").textContent = example ? "Sample data · no scan was run." : `Report ${report.id || "unknown"} · ${report.status || "unknown"} · created ${created} · expires ${expires}${budget}`;
+    $("#report-privacy-warning").textContent = example ? "Sample data; no scan was run." : "Anyone with this link can view the report until it expires. Share it only with approved reviewers.";
     // A printed handoff leaves the browser chrome behind, so the artifact
     // carries its own bearer link. Sample data has no real link and prints
     // without one (:empty keeps the paragraph invisible).
@@ -449,7 +471,9 @@
     reportPanel.classList.remove("hidden");
     if (updateLocation) history.pushState({ reportId: report.id }, "", `#${report.id}`);
     document.title = example ? "Example report: VulnScope" : `${report.hostname}: VulnScope`;
+    const displayedToken=runToken;
     setTimeout(() => {
+      if(displayedToken!==runToken||state.report?.id!==report.id)return;
       scrollToElement(reportPanel, "start");
       // The view swap is announced by the live regions, but keyboard and
       // screen-reader focus still needs to land on the new context.
@@ -549,7 +573,9 @@
       </div>
       ${findingList("New findings", comparison.added, "added")}
       ${findingList("Resolved findings", comparison.resolved, "resolved")}
-      <p class="comparison-note">Findings are matched by their stable IDs; counts come from each report's own summary.</p>`;
+      ${findingList("Not rechecked / coverage not comparable", comparison.notRechecked, "unknown")}
+      ${findingList("Changed evidence or severity", comparison.changed, "changed")}
+      <p class="comparison-note">Resolved requires matching targets and successfully rechecked coverage. Counts describe each report, not proof of remediation.</p>`;
     panel.querySelector(".comparison-close").addEventListener("click", () => {
       panel.classList.add("hidden");
       $("#report-host").focus({ preventScroll: true });
@@ -650,7 +676,7 @@
           <span class="finding-category">${escapeHtml(f.category || "")}</span>
         </div>
         <div class="finding-body">
-          <h4>${escapeHtml(f.title)}</h4>
+          <h3>${escapeHtml(f.title)}</h3>
           <p>${escapeHtml(f.detail)}</p>
           ${f.evidence ? `<pre class="finding-evidence">${escapeHtml(f.evidence)}</pre>` : ""}
           ${f.recommendation ? `<div class="finding-recommendation"><strong>Fix</strong><span>${escapeHtml(f.recommendation)}</span></div>` : ""}
@@ -869,21 +895,73 @@
     URL.revokeObjectURL(url);
   }
 
-  function exportMarkdown() {
-    if (!state.report?.id) return;
-    // The server is the single rendering authority for Markdown (same rule
-    // that keeps a client copy of the builder out of this file); this only
-    // opens its attachment response. Scans are persisted before the report
-    // is displayed, so the endpoint can serve even a just-finished scan.
-    const anchor = document.createElement("a");
-    anchor.href = `${API_BASE}/api/scans/${encodeURIComponent(state.report.id)}/export?format=markdown`;
-    // Empty download hint keeps the browser on the attachment's own filename
-    // instead of navigating to it if Content-Disposition were ever dropped.
-    anchor.download = "";
-    anchor.click();
+  function cancelMarkdownExport() {
+    if (!markdownAbort) return;
+    markdownAbort.abort();
+    markdownAbort = null;
+    const button = $("#export-markdown");
+    button.disabled = false;
+    clearTimeout(Number(button.dataset.flashTimer || 0));
+    delete button.dataset.flashTimer;
+    delete button.dataset.label;
+    button.textContent = "Export Markdown";
+  }
+
+  async function exportMarkdown() {
+    if (!state.report?.id || state.isExample || markdownAbort) return;
+    const report = state.report;
+    const token = runToken;
+    if ($("#error-code").textContent === "EXPORT_FAILED") errorPanel.classList.add("hidden");
+    const abort = new AbortController();
+    markdownAbort = abort;
+    const ownsExport = () => markdownAbort === abort && token === runToken && state.report === report;
+    const button = $("#export-markdown");
+    clearTimeout(Number(button.dataset.flashTimer || 0));
+    delete button.dataset.flashTimer;
+    delete button.dataset.label;
+    button.textContent = "Preparing…";
+    button.disabled = true;
+    let timedOut = false;
+    const timeout = setTimeout(() => { timedOut = true; abort.abort(); }, 45_000);
+    try {
+      // Keep the server as the sole Markdown renderer, but verify its
+      // response before downloading: expired reports return JSON errors.
+      const response = await fetch(`${API_BASE}/api/scans/${encodeURIComponent(report.id)}/export?format=markdown`, { signal: abort.signal });
+      if (!ownsExport()) return;
+      if (!response.ok) {
+        let message = `The report could not be exported (HTTP ${response.status}).`;
+        try {
+          const payload = await response.json();
+          if (typeof payload?.error === "string") message = payload.error;
+        } catch { /* Keep the HTTP message for non-JSON errors. */ }
+        throw new Error(message);
+      }
+      const blob = await response.blob();
+      if (!ownsExport() || abort.signal.aborted) return;
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const slug = value => String(value || "").replace(/[^A-Za-z0-9.-]+/g, "-").replace(/^-+|-+$/g, "") || "report";
+      anchor.href = url;
+      anchor.download = `vulnscope-${slug(report.hostname)}-${slug(report.id)}.md`;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      flashButton(button, "Exported");
+    } catch (error) {
+      if (!ownsExport()) return;
+      flashButton(button, "Export failed");
+      showError(timedOut ? "The export timed out. Check your connection and try again." : error instanceof TypeError ? "Network request failed. Check your connection and try again." : friendlyError(error), { badge: "EXPORT_FAILED" });
+    } finally {
+      clearTimeout(timeout);
+      if (ownsExport()) {
+        markdownAbort = null;
+        button.disabled = false;
+      }
+    }
   }
 
   function reset({ replaceHistory = false } = {}) {
+    reportHeading(2);
+    cancelMarkdownExport();
     runToken++;
     // Tear down any in-flight scan or report fetch owned by the abandoned
     // run; its completions are already invalidated by the token bump.
@@ -942,6 +1020,10 @@
 
   window.addEventListener("popstate", () => {
     const id = location.hash.slice(1);
+    if(id==="example"||REPORT_ID_SHAPE.test(id)||!id){
+      cancelMarkdownExport();
+      runToken++;activeAbort?.abort();activeAbort=null;busy=false;stopProgress();updateScanAvailability();
+    }
     if (id === "example") {
       if (!busy && !state.isExample) showExample();
       return;
@@ -953,6 +1035,6 @@
     // Back/Forward returned to a hashless entry while a report is on screen:
     // restore the landing view so the page matches the URL. Anchor jumps such
     // as #status intentionally keep the current view.
-    if (location.hash === "" && state.report) reset({ replaceHistory: true });
+    if (location.hash === "") reset({ replaceHistory: true });
   });
 })();
