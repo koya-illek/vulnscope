@@ -131,9 +131,6 @@
   $("#method-button").addEventListener("click", (event) => openMethodDialog(event.currentTarget));
   $("#footer-method-button").addEventListener("click", (event) => openMethodDialog(event.currentTarget));
   $("#dialog-close").addEventListener("click", () => methodDialog.close());
-  methodDialog.addEventListener("click", (event) => {
-    if (event.target === methodDialog) methodDialog.close();
-  });
   methodDialog.addEventListener("close", () => {
     methodDialogReturnFocus?.focus();
     methodDialogReturnFocus = null;
