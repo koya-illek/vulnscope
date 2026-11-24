@@ -77,6 +77,13 @@
         : "Confirm permission to enable the scan.";
   }
 
+  const scopeCheckboxes = [probePathsCheckbox, checkTakeoverCheckbox, checkWordPressCheckbox, probeTraceCheckbox];
+  function updateScopeSelection() {
+    const count = scopeCheckboxes.filter(checkbox => checkbox.checked).length;
+    $("#scope-selection-count").textContent = count ? `${count} extra probe${count === 1 ? "" : "s"} selected` : "No extra probes selected";
+  }
+  scopeCheckboxes.forEach(checkbox => checkbox.addEventListener("change", updateScopeSelection));
+  updateScopeSelection();
   authConfirm?.addEventListener("change", updateScanAvailability);
   updateScanAvailability();
 
@@ -98,6 +105,7 @@
     runScan(input.value);
   });
   $("#new-scan").addEventListener("click", () => reset());
+  $("#new-scan-top").addEventListener("click", () => reset());
   $("#cancel-scan").addEventListener("click", () => reset());
   $("#example-link").addEventListener("click", () => showExample());
   $("#error-close").addEventListener("click", () => {
@@ -452,7 +460,16 @@
       .map(([name, phase]) => `${({ tlsProtocolCipher: "Active TLS", certificateEvidence: "Certificate history", paths: "Sensitive paths", takeover: "Subdomain takeover", wordpress: "WordPress" })[name] || name}: ${phase.status}`);
     $("#grade-coverage").textContent = `This grade covers observed HTTP evidence. ${omissions.join(". ")}${omissions.length ? "." : ""} It does not certify site security.`;
     renderMetrics(report.summary || {});
-    renderFindings(report.findings || []);
+    const findings = report.findings || [];
+    const severityOrder = ["critical", "high", "medium", "low", "info"];
+    const first = findings.reduce((best, finding) => {
+      const rank = severityOrder.indexOf(finding.severity);
+      return rank >= 0 && (!best || rank < severityOrder.indexOf(best.severity)) ? finding : best;
+    }, null);
+    $("#priority-finding").classList.toggle("hidden", !first);
+    $("#priority-finding-title").textContent = first ? `${first.severity.toUpperCase()}: ${first.title}` : "";
+    $("#priority-finding-action").textContent = first ? (first.recommendation || first.detail) : "";
+    renderFindings(findings);
     renderDnsSsl(report);
     renderHeadersAudit(report.headers || {});
     renderCoverage(report.coverage || {});

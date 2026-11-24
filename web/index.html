@@ -60,6 +60,8 @@
           <span>No login required</span>
         </div>
         <p class="baseline-scope">The default scan checks the public page, security headers, CORS, and available DNS and certificate evidence without logging in. Extra probes below are off unless you choose them.</p>
+        <details class="advanced-scope" id="advanced-scope">
+          <summary>Advanced scan scope <span id="scope-selection-count">No extra probes selected</span></summary>
         <fieldset class="scan-scope">
           <legend>Optional scan scope</legend>
           <label class="deps-toggle">
@@ -91,6 +93,7 @@
             </span>
           </label>
         </fieldset>
+        </details>
         <label class="auth-checkbox">
           <input type="checkbox" id="auth-confirm" name="authConfirm" required>
           <span class="deps-toggle-text">
@@ -175,7 +178,7 @@
 
           <p class="report-share-url" id="report-share-url"></p>
         </div>
-
+        <button class="secondary-button" id="new-scan-top" type="button">New scan</button>
       </header>
 
       <section class="comparison-panel hidden" id="comparison-panel" tabindex="-1"></section>
@@ -188,6 +191,11 @@
         <div class="metrics" id="metrics"></div>
       </div>
       <p class="grade-coverage" id="grade-coverage"></p>
+      <section class="priority-finding hidden" id="priority-finding" aria-labelledby="priority-finding-title">
+        <h3 id="priority-finding-title"></h3>
+        <p id="priority-finding-action"></p>
+        <a href="#findings-list">View supporting evidence</a>
+      </section>
 
       <div class="section-heading">
         <div>

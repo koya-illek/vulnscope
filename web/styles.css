@@ -965,3 +965,37 @@ body:has(#report:not(.hidden)) #recent-scans { display:none; }
 .finding-severity, .finding-category, .finding-evidence, .finding-recommendation strong { font-size: .75rem; line-height: 1.5; }
 .error-panel > div { min-inline-size: 0; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .error-panel { flex-wrap: wrap; gap: 12px; } .error-panel > div { flex: 1 1 100%; } }
+
+/* Default scanning stays short; optional probes retain their native controls. */
+.advanced-scope { margin-block: 18px; border: 1px solid var(--line); padding: 12px 16px; }
+.advanced-scope > summary { cursor: pointer; min-block-size: 44px; align-content: center; font-weight: 600; }
+#scope-selection-count { display: block; padding-inline-start: 18px; color: var(--muted); font: 400 13px/1.5 var(--sans); }
+.priority-finding { margin-block: 20px 32px; padding: 20px; border: 1px solid var(--line-bright); background: var(--surface); }
+.priority-finding h3 { margin: 0 0 12px; font-size: 20px; line-height: 1.3; }
+.priority-finding p { margin: 0 0 16px; color: var(--text); line-height: 1.6; }
+.priority-finding a { display: inline-block; min-block-size: 44px; align-content: center; }
+.grade-section { margin-block: 24px 12px; gap: 12px; }
+.grade-badge { padding: 16px; min-width: 120px; }
+.grade-letter { font-size: 48px; letter-spacing: -.03em; }
+.grade-section .metric { padding: 16px 12px; }
+.grade-section .metric small { font-size: 12px; letter-spacing: 0; }
+.grade-section .metric strong { margin-block-start: 8px; font-size: 22px; }
+.grade-coverage { margin-block: 12px 20px; }
+@media (max-width: 600px) {
+  .grade-section { flex-direction: row; flex-wrap: wrap; }
+  .grade-badge { flex-direction: row; justify-content: start; min-width: 0; inline-size: 100%; padding: 12px 16px; }
+  .grade-section .metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); flex-basis: 100%; }
+  .grade-section .metric { padding: 12px 5px; min-inline-size: 0; }
+  .grade-section .metric small { font-size: 12px; letter-spacing: 0; overflow-wrap: anywhere; }
+  .grade-section .metric strong { font-size: 20px; }
+  .priority-finding { padding: 16px; }
+}
+
+@media (max-width: 600px) {
+  .report { padding-block-start: 24px; }
+  .report-header { gap: 16px; padding-block-end: 20px; }
+  .grade-section .metric:last-child { grid-column: auto; }
+  .grade-coverage { padding: 12px; }
+}
+
+@media (max-width: 360px) { .grade-section .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
