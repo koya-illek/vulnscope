@@ -199,3 +199,11 @@ Live service: [vulnscope.illek.ie](https://vulnscope.illek.ie).
 ### Release identity
 
 `GET /api/health` reports process liveness only, not database connectivity, provider freshness or scan coverage. `sourceRevision` is supplied by `npm run deploy` from a clean Git tree; `deploymentId` comes from Cloudflare version metadata. Local or directly deployed builds without revision metadata report `unknown`. Use the maintained deploy script to preserve release provenance.
+
+### Email diagnostic handoff
+
+Real reports offer a manual Email Security link for their hostname. It passes
+only the hostname in a fragment, with no referring report URL, path, query,
+report ID, findings or evidence. The destination only prefills its form; the
+user reviews the domain and explicitly starts any check. Sample reports and
+invalid/local/internal hostnames do not offer this handoff.

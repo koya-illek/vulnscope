@@ -46,6 +46,8 @@
       <h1>Find what's<br><em>exposed.</em></h1>
       <p class="hero-copy">Unauthenticated external exposure scan for public files, security headers, certificate evidence, CORS, and optional takeover risk in one evidence-backed report.</p>
 
+      <p class="example-hint">Not sure what you get? <button class="text-button example-link" id="example-link" type="button">View an example report</button></p>
+
       <form class="trace-form" id="scan-form">
         <label for="url-input">Target URL</label>
         <div class="input-shell">
@@ -57,6 +59,7 @@
           <span>Reports expire after 14 days</span>
           <span>No login required</span>
         </div>
+        <p class="baseline-scope">The default scan checks the public page, security headers, CORS, and available DNS and certificate evidence without logging in. Extra probes below are off unless you choose them.</p>
         <fieldset class="scan-scope">
           <legend>Optional scan scope</legend>
           <label class="deps-toggle">
@@ -104,7 +107,6 @@
         </div>
       </form>
 
-      <p class="example-hint">Not sure what you get? <button class="text-button example-link" id="example-link" type="button">View an example report</button></p>
 
       <div class="recent-scans hidden" id="recent-scans">
         <div class="recent-head">
@@ -185,7 +187,7 @@
         </div>
         <div class="metrics" id="metrics"></div>
       </div>
-      <p class="observation-note" id="grade-coverage"></p>
+      <p class="grade-coverage" id="grade-coverage"></p>
 
       <div class="section-heading">
         <div>
@@ -204,6 +206,7 @@
       <p class="visually-hidden" role="status" id="findings-status"></p>
       <div class="findings-list" id="findings-list"></div>
 
+        <p id="email-handoff" class="report-privacy-warning hidden"><a id="email-handoff-link" rel="noreferrer" href="https://email.illek.ie/">Check this domain’s email security</a> · Opens Email Security with only the hostname. You start the check there.</p>
         <div class="report-actions">
           <button class="secondary-button" id="copy-link" type="button">Share report</button>
           <details class="export-menu"><summary>Export report</summary><div class="export-options">
@@ -213,7 +216,7 @@
           <button class="secondary-button hidden" id="compare-previous" type="button">Compare with previous</button>
           <button class="secondary-button" id="new-scan" type="button" aria-label="Start a new scan">New scan</button>
         </div>
-          <p class="report-privacy-warning">Anyone with this link can view the report until it expires. Share it only with approved reviewers.</p>
+          <p id="report-privacy-warning" class="report-privacy-warning">Anyone with this link can view the report until it expires. Share it only with approved reviewers.</p>
 
       <section class="panel details-panel">
         <div class="panel-header">

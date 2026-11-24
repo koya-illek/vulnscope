@@ -179,7 +179,7 @@ input:focus-visible,
   gap: 18px;
   margin-top: 16px;
 }
-.scan-submit-help { color: var(--muted); font: 400 10px/1.5 var(--mono); text-align: right; }
+.scan-submit-help { color: var(--muted); font: 400 .75rem/1.5 var(--mono); text-align: right; }
 .scan-submit {
   min-width: 220px;
   min-height: 56px;
@@ -207,7 +207,7 @@ input:focus-visible,
 }
 .auth-checkbox input { flex: 0 0 auto; margin: 1px 0 0; width: 22px; height: 22px; accent-color: var(--warning); cursor: pointer; }
 .auth-checkbox .deps-toggle-text strong { display: block; font-size: 13px; color: var(--text); }
-.auth-checkbox .deps-toggle-text small { display: block; margin-top: 2px; color: var(--muted); font: 400 10px/1.5 var(--mono); }
+.auth-checkbox .deps-toggle-text small { display: block; margin-top: 2px; color: var(--muted); font: 400 .75rem/1.5 var(--mono); }
 
 .scan-scope { max-width: 900px; margin: 18px 0 0; padding: 0; border: 0; }
 .scan-scope legend { margin-bottom: 4px; color: var(--muted); font: 500 11px/1.4 var(--mono); text-transform: uppercase; letter-spacing: .08em; }
@@ -218,7 +218,7 @@ input:focus-visible,
 }
 .deps-toggle input { flex: 0 0 auto; margin: 1px 0 0; width: 22px; height: 22px; accent-color: var(--accent); cursor: pointer; }
 .deps-toggle-text strong { display: block; font-size: 13px; color: var(--text); }
-.deps-toggle-text small { display: block; margin-top: 2px; color: var(--muted); font: 400 10px/1.5 var(--mono); }
+.deps-toggle-text small { display: block; margin-top: 2px; color: var(--muted); font: 400 .75rem/1.5 var(--mono); }
 .hero-route {
   position: absolute;
   right: 8px;
@@ -476,7 +476,7 @@ input:focus-visible,
 
 /* Severity filters */
 .filter-set { display: flex; gap: 5px; }
-.filter { min-height: 44px; padding: 8px 11px; border: 1px solid transparent; background: transparent; color: var(--muted); font: 400 10px/1 var(--mono); cursor: pointer; }
+.filter { min-height: 44px; padding: 8px 11px; border: 1px solid transparent; background: transparent; color: var(--muted); font: 400 .75rem/1.4 var(--mono); cursor: pointer; }
 .filter.active { border-color: var(--line-bright); color: var(--accent); }
 .filter[data-filter="critical"].active { color: var(--critical); border-color: rgba(255,111,125,.4); }
 .filter[data-filter="high"].active { color: var(--high); border-color: rgba(255,159,67,.4); }
@@ -958,3 +958,10 @@ body:has(#report:not(.hidden)) #recent-scans { display:none; }
 .supporting-details[open] > summary { margin-bottom:20px; }
 .supporting-details .developer-links { margin-top:20px; }
 @media print { .export-menu, .report-actions, .report-share-note { display:none; } }
+
+/* Scope and coverage are prose, not label/value grids. */
+.baseline-scope { max-inline-size: 75ch; color: var(--muted); font-size: .875rem; line-height: 1.6; margin-block: 20px 0; }
+.grade-coverage { margin-block: 20px; padding: 20px; background: rgba(255,118,87,.05); color: var(--muted); font-size: .875rem; line-height: 1.6; overflow-wrap: anywhere; }
+.finding-severity, .finding-category, .finding-evidence, .finding-recommendation strong { font-size: .75rem; line-height: 1.5; }
+.error-panel > div { min-inline-size: 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .error-panel { flex-wrap: wrap; gap: 12px; } .error-panel > div { flex: 1 1 100%; } }
