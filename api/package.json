@@ -24,7 +24,7 @@
     "wrangler": "^4.166.0"
   },
   "dependencies": {
-    "tldts": "^7.4.16"
+    "tldts": "^7.5.5"
   },
   "overrides": {
     "sharp": "0.35.5"
